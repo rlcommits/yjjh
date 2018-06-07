@@ -4,7 +4,7 @@
 // @version      1.0.0
 // @description  just to make the game eaiser!
 // @author       RL
-// @include      http://sword-direct*.yytou.cn:8086/*
+// @include      http://sword-direct37.yytou.cn:8086/?id=4239029*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
