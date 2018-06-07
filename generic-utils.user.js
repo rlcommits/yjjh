@@ -9,7 +9,7 @@
 // @grant        none
 // ==/UserScript==
 
-var yjjhAssistantScript = function () {
+var yjjhGenericUtilsScript = function () {
     class Job {
         constructor (id, interval, startEvent) {
             this._id = id;
@@ -5925,4 +5925,4 @@ var yjjhAssistantScript = function () {
     inintializeHelpButtons(helperConfigurations);
 };
 
-window.setTimeout(yjjhAssistantScript, 1000);
+window.setTimeout(yjjhGenericUtilsScript, 1000);
