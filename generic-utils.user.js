@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
+// @version      2.0.1
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn:8086/*
@@ -1987,7 +1987,7 @@ var yjjhGenericUtilsScript = function () {
         _targets: [],
 
         identifyFugitives () {
-            let messages = Panels.Chatting.filterMessageObjectsByKeyword(/【系统】跨服：\[36-40区\](段老大|二娘)逃到了跨服时空(.*?)之中，众位英雄快来诛杀。/);
+            let messages = Panels.Chatting.filterMessageObjectsByKeyword(/【系统】跨服：\[36-40区\](.*?)逃到了跨服时空(.*?)之中，众位英雄快来诛杀。/);
             // let latestMessage = '【系统】[36-40区]段老大慌不择路，逃往了全真教-终南山路';
 
             if (messages.length) {
@@ -2709,7 +2709,7 @@ var yjjhGenericUtilsScript = function () {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
         },
 
-        _REG_DRAGON_APPERS: '^青龙会组织：(\\[36\\-40区\\].*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。',
+        _REG_DRAGON_APPERS: '^青龙会组织：((\\[36\\-40区\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。',
         _regKeywords: GlobalUserInformation.getNickName() === '邱鸣' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
             '碎片',
             '斩龙宝镯'
@@ -5193,9 +5193,9 @@ var yjjhGenericUtilsScript = function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc?')) {
-                        let travelsalPath = '#7 e;#3 w;n;#3 w;#7 e;#3 w;n;#3 w;#7 e;n;#3 w;#7 e'.split(';').extract();
+                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;n;#3 w;#6 e'.split(';').extract();
                         MapCleanerV2.initialize(travelsalPath, 5000);
-                        MapCleanerV2.gotoStartPoint('#4 s;#4 w');
+                        MapCleanerV2.gotoStartPoint('#4 s;#3 w');
 
                         await MapCleanerV2.start();
                     } else {
