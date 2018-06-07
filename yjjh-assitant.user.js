@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YJJH Assistant
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  just to make the game eaiser!
 // @author       RL
 // @match        http://sword-direct*/.yytou.cn:8086/*
