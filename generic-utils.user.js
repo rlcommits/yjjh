@@ -5215,7 +5215,7 @@ var yjjhAssistantScript = function () {
             id: 'id-auto-perform',
             width: '64px',
             marginRight: '1px',
-            title: '自动攒气出招, 预留 2 气\n\n注意：必刷技能设置多于四个时不适用',
+            title: '自动攒气出招, 预留 2 气\n\n注意：\n1. 必刷技能设置多于四个时可能连招失败\n2. 只匹配到一个招数名字时，按单招触发\n3. 暂时不支持设置预留气的数目',
 
             async eventOnClick () {
                 let defaultText = PerformHelper.getCombatSetting().getSkillsAbbr();
@@ -5234,7 +5234,7 @@ var yjjhAssistantScript = function () {
             }
         }, {
             label: '.',
-            title: '设置战斗中出的绝学阵法...',
+            title: '设置战斗中出的招数，用半角+可以设置连招...',
             width: '10px',
             id: 'id-auto-perform-setting',
 
@@ -5350,8 +5350,8 @@ var yjjhAssistantScript = function () {
             }
         }, {
         }, {
-            label: '道心回内',
-            title: '点开任意 npc 到有比试选项的界面，即可自动持续切磋至内力补满 90%。\n\n注意：\n1. 必刷道心\n2. 为避免 npc 血太少无法持续切磋，脚本会持续自动逃跑再进入战斗放道心\n3. 中途可手工停止',
+            label: '切磋回内',
+            title: '点开任意 npc 到有比试选项的界面，即可自动持续切磋至内力补满 90%。\n\n注意：\n1. 必刷道心（需链接不动）\n2. 为避免 npc 血太少无法持续切磋，脚本会持续自动逃跑再进入战斗放道心\n3. 中途可手工停止',
             id: 'id-force-recovery-by-fight',
 
             async eventOnClick () {
