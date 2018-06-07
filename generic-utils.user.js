@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         YJJH Assistant
+// @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      2.0.0
 // @description  just to make the game eaiser!
 // @author       RL
 // @match        http://sword-direct*/.yytou.cn:8086/*
