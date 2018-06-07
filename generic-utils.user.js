@@ -4,8 +4,8 @@
 // @version      2.0.0
 // @description  just to make the game eaiser!
 // @author       RL
-// @match        http://sword-direct*/.yytou.cn:8086/*
-// @run-at       document-end
+// @include      http://sword-direct*.yytou.cn:8086/*
+// @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
