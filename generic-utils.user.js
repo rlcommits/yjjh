@@ -6,10 +6,12 @@
 // @author       RL
 // @include      http://sword-direct*.yytou.cn:8086/*
 // @run-at       document-idle
-// @grant        none
+// @grant        unsafeWindow
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
-var yjjhGenericUtilsScript = function () {
+window.setTimeout(function () {
     class Job {
         constructor (id, interval, startEvent) {
             this._id = id;
@@ -48,6 +50,14 @@ var yjjhGenericUtilsScript = function () {
         }
     };
 
+    var System = {
+        globalObjectMap: window.unsafeWindow.g_obj_map,
+
+        replaceControlCharBlank (valueWithColor) {
+            return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
+        }
+    };
+
     var GlobalUserInformation = {
         async initialize () {
             await ButtonManager.click('skills');
@@ -83,49 +93,49 @@ var yjjhGenericUtilsScript = function () {
         },
 
         getSkillsEnabled (type = 'attack') {
-            return window.g_obj_map.get('msg_skills').elements.filter(function (v) {
+            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
                 if (!v['key'].includes('skill')) return false;
                 let info = Array.isArray(v['value']) ? v['value'] : v['value'].split(',');
                 return info[info.length - 3] === '1' && (!type || info[info.length - 4] === type);
-            }).map(v => GenericUtils.removeColor(v['value'].split(',')[1]));
+            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
         },
 
         getSkillsInUpgrading () {
-            return window.g_obj_map.get('msg_skills').elements.filter(function (v) {
+            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
                 let values = v['value'].split(',');
                 return values.length > 1 && (values[values.length - 1] === '4');
-            }).map(v => GenericUtils.removeColor(v['value'].split(',')[1]));
+            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
         },
 
         getSkillsInPractice () {
-            return window.g_obj_map.get('msg_skills').elements.filter(function (v) {
+            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
                 let values = v['value'].split(',');
                 return values.length > 1 && (values[values.length - 1] === '1');
-            }).map(v => GenericUtils.removeColor(v['value'].split(',')[1]));
+            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
         },
 
         getNickName () {
-            return window.g_obj_map.get('msg_attrs').get('name');
+            return System.globalObjectMap.get('msg_attrs').get('name');
         },
 
         getMaxEnforce () {
-            return parseInt(window.g_obj_map.get('msg_score').get('max_enforce'));
+            return parseInt(System.globalObjectMap.get('msg_score').get('max_enforce'));
         },
 
         getMaxKee () {
-            return parseInt(window.g_obj_map.get('msg_attrs').get('max_kee'));
+            return parseInt(System.globalObjectMap.get('msg_attrs').get('max_kee'));
         },
 
         getCurrentKee () {
-            return parseInt(window.g_obj_map.get('msg_attrs').get('kee'));
+            return parseInt(System.globalObjectMap.get('msg_attrs').get('kee'));
         },
 
         getCurrentForce () {
-            return parseInt(window.g_obj_map.get('msg_attrs').get('force'));
+            return parseInt(System.globalObjectMap.get('msg_attrs').get('force'));
         },
 
         getMaxForce () {
-            return parseInt(window.g_obj_map.get('msg_attrs').get('max_force'));
+            return parseInt(System.globalObjectMap.get('msg_attrs').get('max_force'));
         }
     };
 
@@ -1091,7 +1101,7 @@ var yjjhGenericUtilsScript = function () {
 
         _steps: [],
         follow () {
-            if (window.g_obj_map.get('msg_room').get('map_id') === 'shenshousenlin') return;
+            if (System.globalObjectMap.get('msg_room').get('map_id') === 'shenshousenlin') return;
 
             let latestMessages = Panels.Notices.getMessages('【队伍】(.*?)：(.*)');
             if (latestMessages.length === 0) return;
@@ -1285,7 +1295,7 @@ var yjjhGenericUtilsScript = function () {
                     if (candidates[i].getTalked()) {
                         continue;
                     } else if (!candidates[i].getAvailability()) {
-                        if (i >= 4 || window.window.confirm(candidates[i].getName() + '当前无法对话，确定跳过继续？按取消可退出本轮对话。')) {
+                        if (i >= 4 || window.confirm(candidates[i].getName() + '当前无法对话，确定跳过继续？按取消可退出本轮对话。')) {
                             debugging(candidates[i].getName() + ' skipped.');
                             continue;
                         }
@@ -1433,7 +1443,7 @@ var yjjhGenericUtilsScript = function () {
 
                 for (let i = this._candidates.length - 1; i >= 0; i--) {
                     debugging('get ' + this._candidates[i].getId());
-                    window.clickButton('get ' + this._candidates[i].getId());
+                    ButtonManager.click('get ' + this._candidates[i].getId(), 0);
 
                     if (await this._searchComplete(this._candidates[i].getId())) {
                         this._candidates.pop();
@@ -1520,7 +1530,7 @@ var yjjhGenericUtilsScript = function () {
         _enforceSnapshot: 0,
 
         suppressEnforce () {
-            EnforceHelper._enforceSnapshot = parseInt(window.g_obj_map.get('msg_attrs').get('force_factor'));
+            EnforceHelper._enforceSnapshot = parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'));
             ButtonManager.click('enforce 0', 0);
         },
 
@@ -1529,7 +1539,7 @@ var yjjhGenericUtilsScript = function () {
         },
 
         snapshotEnforce () {
-            EnforceHelper._enforceSnapshot = parseInt(window.g_obj_map.get('msg_attrs').get('force_factor'));
+            EnforceHelper._enforceSnapshot = parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'));
         },
 
         maximizeEnforce () {
@@ -1555,8 +1565,8 @@ var yjjhGenericUtilsScript = function () {
         },
 
         goodEnough () {
-            let currentForce = parseInt((window.g_obj_map.get('msg_attrs').get('force')));
-            let maxForce = parseInt((window.g_obj_map.get('msg_attrs').get('max_force')));
+            let currentForce = parseInt((System.globalObjectMap.get('msg_attrs').get('force')));
+            let maxForce = parseInt((System.globalObjectMap.get('msg_attrs').get('max_force')));
             debugging('current/max=' + currentForce + '/' + maxForce);
 
             return currentForce >= maxForce * 0.9;
@@ -1618,7 +1628,7 @@ var yjjhGenericUtilsScript = function () {
                 ButtonManager.resetButtonById('id-escape');
             }
 
-            window.clickButton('diaoyu', 0);
+            ButtonManager.click('diaoyu', 0);
         },
 
         stopFishing () {
@@ -1807,8 +1817,8 @@ var yjjhGenericUtilsScript = function () {
         },
 
         recoverBySkill () {
-            let currentKee = window.g_obj_map.get('msg_attrs').get('kee');
-            let maxKee = window.g_obj_map.get('msg_attrs').get('max_kee');
+            let currentKee = System.globalObjectMap.get('msg_attrs').get('kee');
+            let maxKee = System.globalObjectMap.get('msg_attrs').get('max_kee');
             if ((currentKee / maxKee) < RecoveryHelper._threshold) {
                 debugging('current kee/max kee=' + currentKee + '/' + maxKee);
                 PerformHelper.perform(RecoveryHelper._skill);
@@ -1843,8 +1853,8 @@ var yjjhGenericUtilsScript = function () {
         },
 
         async recoverForce () {
-            let currentForce = window.g_obj_map.get('msg_attrs').get('force');
-            let maxForce = window.g_obj_map.get('msg_attrs').get('max_force');
+            let currentForce = System.globalObjectMap.get('msg_attrs').get('force');
+            let maxForce = System.globalObjectMap.get('msg_attrs').get('max_force');
             let gap = maxForce - currentForce;
             if (gap < 2000) {
                 log('内力已足 (' + currentForce + '/' + maxForce + ')，无需服用灵芝。');
@@ -2128,9 +2138,9 @@ var yjjhGenericUtilsScript = function () {
             getSkillLinksV2 (skills) {
                 if (!Array.isArray(skills)) skills = [skills];
 
-                return window.g_obj_map.elements
+                return System.globalObjectMap.elements
                     .filter(v => v['key'].includes('skill_button'))
-                    .filter(v => skills.includes(GenericUtils.removeColor(v['value'].get('name'))))
+                    .filter(v => skills.includes(System.replaceControlCharBlank(v['value'].get('name'))))
                     .map(v => 'clickButton("playskill ' + v['value'].get('pos') + '", 0)');
             },
 
@@ -2145,7 +2155,7 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getAvailableSkills (skills = []) {
-                let allAvailableSkills = window.g_obj_map.elements.filter(v => v['key'].includes('skill_button')).map(v => GenericUtils.removeColor(v['value'].get('name')));
+                let allAvailableSkills = System.globalObjectMap.elements.filter(v => v['key'].includes('skill_button')).map(v => System.replaceControlCharBlank(v['value'].get('name')));
                 if (skills.length > 0) {
                     return allAvailableSkills.filter(v => skills.includes(v));
                 } else {
@@ -2170,7 +2180,7 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getCombatInfo () {
-                let vsInfo = window.g_obj_map.get('msg_vs_info');
+                let vsInfo = System.globalObjectMap.get('msg_vs_info');
                 let result = [];
                 for (let i = 1; i <= 2; i++) {
                     for (let j = 1; j <= 4; j++) {
@@ -2255,9 +2265,9 @@ var yjjhGenericUtilsScript = function () {
 
         Backpack: {
             getItems (type = 'items') {
-                return window.g_obj_map.get('msg_items').elements.filter(v => v['key'].includes(type)).map(function (v) {
+                return System.globalObjectMap.get('msg_items').elements.filter(v => v['key'].includes(type)).map(function (v) {
                     let values = v['value'].split(',');
-                    let item = new Item(GenericUtils.removeColor(values[1]), values[0], parseInt(values[2]));
+                    let item = new Item(System.replaceControlCharBlank(values[1]), values[0], parseInt(values[2]));
                     return item;
                 });
             }
@@ -2283,13 +2293,13 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getName () {
-                if (window.g_obj_map.get('msg_room')) return window.g_obj_map.get('msg_room').get('short');
+                if (System.globalObjectMap.get('msg_room')) return System.globalObjectMap.get('msg_room').get('short');
 
-                return window.g_obj_map.get('msg_attrs').get('room_name');
+                return System.globalObjectMap.get('msg_attrs').get('room_name');
             },
 
             getType () {
-                return window.g_obj_map.get('msg_room').get('type');
+                return System.globalObjectMap.get('msg_room').get('type');
             },
 
             getAvailableNpcs (name = '') {
@@ -2310,24 +2320,24 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getAvailableNpcsV2 (name = '', fighting = false) {
-                return window.g_obj_map.get('msg_room').elements.filter(function (v) {
+                return System.globalObjectMap.get('msg_room').elements.filter(function (v) {
                     if (!v['key'].includes('npc')) return false;
 
                     let values = v['value'].split(',');
-                    if (name && name !== GenericUtils.removeColor(values[1])) return false;
+                    if (name && name !== System.replaceControlCharBlank(values[1])) return false;
                     if (fighting && values[2] !== '1') return false;
 
                     return true;
                 }).map(function (v) {
                     let values = v['value'].split(',');
-                    let npc = new Npc(GenericUtils.removeColor(values[1]), values[0]);
+                    let npc = new Npc(System.replaceControlCharBlank(values[1]), values[0]);
                     debugging('发现 ' + npc.toString());
                     return npc;
                 });
             },
 
             getAvailableItemsV2 () {
-                return window.g_obj_map.get('msg_room').elements.filter(v => v['key'].includes('item')).map(function (v) {
+                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('item')).map(function (v) {
                     let values = v['value'].split(',');
                     let item = new Item(values[1], values[0]);
                     debugging('发现 ' + item.toString());
@@ -2351,7 +2361,7 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getPlayers () {
-                return window.g_obj_map.get('msg_room').elements.filter(v => v['key'].includes('user')).map(v => GenericUtils.removeColor(v['value'].split(',')[1]));
+                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('user')).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
             },
 
             isSecurePlace () {
@@ -2359,7 +2369,7 @@ var yjjhGenericUtilsScript = function () {
             },
 
             getAllDirections () {
-                return window.g_obj_map.get('msg_room').elements.filter(v => v['key'].match('east|south|west|north')).map(function (v) {
+                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].match('east|south|west|north')).map(function (v) {
                     let direction = new Direction(v['key']);
                     return direction.getCode();
                 });
@@ -2598,12 +2608,6 @@ var yjjhGenericUtilsScript = function () {
             }
 
             ButtonManager.click(commands, 500);
-        }
-    };
-
-    var GenericUtils = {
-        removeColor (valueWithColor) {
-            return window.g_simul_efun.replaceControlCharBlank(valueWithColor);
         }
     };
 
@@ -2863,7 +2867,7 @@ var yjjhGenericUtilsScript = function () {
 
     var DragonHelper = {
         identifyDragonEvent (message) {
-            return GenericUtils.removeColor(message.get('msg')).match(DragonMonitor._REG_DRAGON_APPERS);
+            return System.replaceControlCharBlank(message.get('msg')).match(DragonMonitor._REG_DRAGON_APPERS);
         },
 
         async locateRoomInformation (dragon) {
@@ -2893,7 +2897,7 @@ var yjjhGenericUtilsScript = function () {
         },
 
         isTarget (npc) {
-            let npcKee = parseInt(window.g_obj_map.get('msg_vs_info').get('vs2_kee1'));
+            let npcKee = parseInt(System.globalObjectMap.get('msg_vs_info').get('vs2_kee1'));
             if (npcKee > 1000 * 10000) {
                 debugging(npc.getName() + ' 血量为 ' + npcKee + ', 锁定青龙，加入战斗。', Panels.Combat.getCombatInfo);
                 return true;
@@ -2976,15 +2980,6 @@ var yjjhGenericUtilsScript = function () {
                         }
                     }
             }
-        }
-    };
-
-    window.webSocketMsg.prototype.originalDispatchMessage = window.gSocketMsg.dispatchMessage;
-    window.gSocketMsg.dispatchMessage = function (message) {
-        this.originalDispatchMessage(message);
-
-        if (MessageMonitor.isEnabled()) {
-            new MessageHandler(message).handle();
         }
     };
 
@@ -3675,11 +3670,11 @@ var yjjhGenericUtilsScript = function () {
         _autoFight: false,
 
         async initialize () {
-            if (!window.g_obj_map.get('msg_team')) {
+            if (!System.globalObjectMap.get('msg_team')) {
                 await ButtonManager.click('team;prev;golook_room');
             }
 
-            let teamName = window.g_obj_map.get('msg_team').get('team_name');
+            let teamName = System.globalObjectMap.get('msg_team').get('team_name');
             debugging('队伍名字：' + teamName);
             if (!teamName) {
                 window.alert('当前没加入任何队伍啊。');
@@ -3748,7 +3743,7 @@ var yjjhGenericUtilsScript = function () {
             }
 
             function isTeamMember (playerName) {
-                return window.g_obj_map.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
+                return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
             }
         },
 
@@ -3836,7 +3831,7 @@ var yjjhGenericUtilsScript = function () {
 
         async start (actionLink = '') {
             if (!actionLink) {
-                let npcId = window.g_obj_map.get('msg_vs_info').get('vs2_pos1');
+                let npcId = System.globalObjectMap.get('msg_vs_info').get('vs2_pos1');
                 EscapeToKillHelper.actionLink = 'clickButton("kill ' + npcId + '")';
             } else {
                 EscapeToKillHelper._actionLink = actionLink;
@@ -3877,7 +3872,7 @@ var yjjhGenericUtilsScript = function () {
             if (!CombatStatus.inProgress()) return true;
 
             debugging('try escaping');
-            window.clickButton('escape');
+            ButtonManager.click('escape', 0);
 
             if (CombatStatus.justFinished()) {
                 debugging('escaped');
@@ -4063,8 +4058,6 @@ var yjjhGenericUtilsScript = function () {
     JobManager.register('id-auto-follower-best-skill', 200, AutoFollower.performComboSkill);
 
     JobManager.register('id-follow-team-lead', 200, TeamworkHelper.follow);
-
-    GlobalUserInformation.initialize();
 
     var helperConfigurations = [{
         subject: '其他项目',
@@ -5923,6 +5916,15 @@ var yjjhGenericUtilsScript = function () {
     }
 
     inintializeHelpButtons(helperConfigurations);
-};
 
-window.setTimeout(yjjhGenericUtilsScript, 1000);
+    GlobalUserInformation.initialize();
+
+    window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
+    window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
+        this.originalDispatchMessage(message);
+
+        if (MessageMonitor.isEnabled()) {
+            new MessageHandler(message).handle();
+        }
+    };
+}, 1000);
