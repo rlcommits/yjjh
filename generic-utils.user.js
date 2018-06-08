@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.1
+// @version      2.1.2
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn:8086/*
@@ -1685,7 +1685,7 @@ window.setTimeout(function () {
         }
 
         async perform (skills, bufferReserved = 0) {
-            if (this._printCombatInfo) debugging('战场信息：', Panels.Combat.getCombatInfo);
+            if (this._printCombatInfo) debugging('战场信息：', null, Panels.Combat.getCombatInfo);
 
             if (!CombatStatus.inProgress()) return false;
             if (this.readyToStop()) return true;
@@ -2848,13 +2848,13 @@ window.setTimeout(function () {
         async locateRoomInformation (dragon) {
             let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : DragonMonitor._goodTargets[dragon.getRoom()];
             let npcs = Objects.Room.getAvailableNpcsV2(target, true);
-            debugging('在场玩家：', DragonHelper.getUserList);
+            debugging('在场玩家：', null, DragonHelper.getUserList);
 
             while (!npcs.length) {
                 debugging('房间信息未刷新，等待并重新刷新检测 - ', Objects.Room.getName);
                 await ExecutionManager.wait(20);
                 npcs = Objects.Room.getAvailableNpcsV2(target, true);
-                debugging('在场玩家：', DragonHelper.getUserList);
+                debugging('在场玩家：', null, DragonHelper.getUserList);
             }
 
             return npcs;
