@@ -52,13 +52,14 @@ window.setTimeout(function () {
 
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
+        debugMode: false,
 
         replaceControlCharBlank (valueWithColor) {
             return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
         }
     };
 
-    var GlobalUserInformation = {
+    var User = {
         async initialize () {
             await ButtonManager.click('skills');
             await ButtonManager.click('prev');
@@ -83,13 +84,13 @@ window.setTimeout(function () {
                 log('恢复不加力。');
 
                 $('#id-enforce').text('恢复加力');
-                $('#id-enforce').attr('title', '点击可开启当前最大加力 ' + GlobalUserInformation.getMaxEnforce());
+                $('#id-enforce').attr('title', '点击可开启当前最大加力 ' + User.getMaxEnforce());
                 $('#id-enforce').css('color', 'red');
             }
 
             await ButtonManager.click('prev');
 
-            document.title = GlobalUserInformation.getNickName();
+            document.title = User.getNickName();
         },
 
         getSkillsEnabled (type = 'attack') {
@@ -136,18 +137,6 @@ window.setTimeout(function () {
 
         getMaxForce () {
             return parseInt(System.globalObjectMap.get('msg_attrs').get('max_force'));
-        }
-    };
-
-    var GlobalScriptSettings = {
-        _debugMode: false,
-
-        getDebugMode () {
-            return GlobalScriptSettings._debugMode;
-        },
-
-        setDebugMode (debugMode) {
-            GlobalScriptSettings._debugMode = debugMode;
         }
     };
 
@@ -317,7 +306,7 @@ window.setTimeout(function () {
 
             await this.fight();
 
-            await ButtonManager.click('enforce ' + GlobalUserInformation.getMaxEnforce());
+            await ButtonManager.click('enforce ' + User.getMaxEnforce());
         }
 
         async fight () {
@@ -325,7 +314,7 @@ window.setTimeout(function () {
                 ButtonManager.click('prev_combat;prev');
                 return true;
             } else if (PerformHelper.readyToPerform(3)) {
-                await PerformHelper.perform(GlobalUserInformation.getSkillsEnabled('attack')[0]);
+                await PerformHelper.perform(User.getSkillsEnabled('attack')[0]);
             } else if (CombatStatus.justFinished()) {
                 ButtonManager.click('prev_combat;swords fight_test go');
             }
@@ -1174,7 +1163,7 @@ window.setTimeout(function () {
             let puppetName = Objects.Room.hasNpc('金甲符兵') ? '金甲符兵' : '玄阴符兵';
             await fight(puppetName, '比试');
 
-            await ButtonManager.click('enforce ' + GlobalUserInformation.getMaxEnforce());
+            await ButtonManager.click('enforce ' + User.getMaxEnforce());
 
             async function fight (name, action, skills, additionalStopEvent) {
                 let combat = new Combat();
@@ -1543,7 +1532,7 @@ window.setTimeout(function () {
         },
 
         maximizeEnforce () {
-            ButtonManager.click(`enforce ${GlobalUserInformation.getMaxEnforce()}`, 0);
+            ButtonManager.click(`enforce ${User.getMaxEnforce()}`, 0);
         }
     };
 
@@ -1832,11 +1821,11 @@ window.setTimeout(function () {
             await RecoveryHelper._retry.initialize(async function recover () {
                 if (CombatStatus.inProgress()) return;
 
-                if (GlobalUserInformation.getCurrentKee() < GlobalUserInformation.getMaxKee()) {
+                if (User.getCurrentKee() < User.getMaxKee()) {
                     await ButtonManager.click('#3 recovery', 250);
                 }
 
-                if (GlobalUserInformation.getCurrentForce() < GlobalUserInformation.getMaxForce() * 0.9) {
+                if (User.getCurrentForce() < User.getMaxForce() * 0.9) {
                     await RecoveryHelper.recoverForce();
                 }
             }, function stopWhen () {
@@ -2165,13 +2154,13 @@ window.setTimeout(function () {
 
             getAvailableAttackSkills () {
                 let skillsAvailable = Panels.Combat.getAvailableSkills();
-                return GlobalUserInformation.getSkillsEnabled('attack').filter(v => skillsAvailable.includes(v));
+                return User.getSkillsEnabled('attack').filter(v => skillsAvailable.includes(v));
             },
 
             getAvailableNonAttackSkills () {
                 let skillsAvailable = Panels.Combat.getAvailableSkills();
-                let dodges = GlobalUserInformation.getSkillsEnabled('recovery');
-                let forces = GlobalUserInformation.getSkillsEnabled('force');
+                let dodges = User.getSkillsEnabled('recovery');
+                let forces = User.getSkillsEnabled('force');
                 return dodges.concat(forces).filter(v => skillsAvailable.includes(v));
             },
 
@@ -2714,12 +2703,12 @@ window.setTimeout(function () {
         },
 
         _REG_DRAGON_APPERS: '^青龙会组织：((\\[36\\-40区\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。',
-        _regKeywords: GlobalUserInformation.getNickName() === '邱鸣' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
+        _regKeywords: User.getNickName() === '邱鸣' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
             '碎片',
             '斩龙宝镯'
         ],
 
-        _regKeywords4ExcludedTargets: GlobalUserInformation.getNickName() === '邱鸣' ? ['天寒', '残雪', '明月'] : [
+        _regKeywords4ExcludedTargets: User.getNickName() === '邱鸣' ? ['天寒', '残雪', '明月'] : [
             '轩辕剑碎片', '破岳'
         ],
 
@@ -2957,7 +2946,8 @@ window.setTimeout(function () {
         },
 
         isEnabled () {
-            return MessageMonitor._enabled;
+            return ButtonManager.isButtonPressed('id-dragon-monitor-kill-good') ||
+                ButtonManager.isButtonPressed('id-dragon-monitor-kill-bad');
         }
     };
 
@@ -2971,10 +2961,9 @@ window.setTimeout(function () {
                 case 'main_msg':
                     if (DragonMonitor.isActive() && !DragonMonitor.getInProgress()) {
                         let dragonEvent = DragonHelper.identifyDragonEvent(this._message);
-                        debugging(dragonEvent);
                         if (dragonEvent) {
                             let dragon = DragonHelper.parseDragonInfo(dragonEvent, this._message.get('msg').split('href;0;')[1].split('')[0]);
-                            debugging(dragon);
+                            debugging('dragon info identified:', dragon);
 
                             new DragonMessageHandler(dragon).handle();
                         }
@@ -3936,7 +3925,7 @@ window.setTimeout(function () {
         async prepare () {
             SnakeKiller._stop = false;
             await ButtonManager.click('score');
-            SnakeKiller._currentEnforce = GlobalUserInformation.getMaxEnforce();
+            SnakeKiller._currentEnforce = User.getMaxEnforce();
         },
 
         stop () {
@@ -4012,7 +4001,7 @@ window.setTimeout(function () {
     }
 
     function debugging (message, func = null) {
-        if (!GlobalScriptSettings.getDebugMode()) return;
+        if (!System.debugMode) return;
 
         if (func) {
             console.debug('[Debug]', message, func());
@@ -4210,19 +4199,7 @@ window.setTimeout(function () {
             id: 'id-debugging',
 
             eventOnClick () {
-                GlobalScriptSettings.setDebugMode(ButtonManager.simpleToggleButtonEvent(this));
-            }
-        }, {
-            label: '消息监听',
-            title: '当消息监听开启，依赖系统推送消息的功能才能起作用。比如青龙监听。',
-            id: 'id-message-monitoring',
-
-            eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    MessageMonitor.enable();
-                } else {
-                    MessageMonitor.disable();
-                }
+                System.debugMode = ButtonManager.simpleToggleButtonEvent(this);
             }
         }, {
         }, {
@@ -4557,7 +4534,7 @@ window.setTimeout(function () {
                 }
 
                 ButtonManager.click(commands);
-                ButtonManager.click('auto_fight 0;enforce ' + GlobalUserInformation.getMaxEnforce());
+                ButtonManager.click('auto_fight 0;enforce ' + User.getMaxEnforce());
             }
         }, {
             label: '学',
@@ -5181,15 +5158,14 @@ window.setTimeout(function () {
             label: '一键森林',
             title: '一键按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc...\n\n注意：\n未经测试版',
             id: 'id-forest-killer',
-            hidden: true,
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc?')) {
                         let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;n;#3 w;#6 e'.split(';').extract();
-                        MapCleanerV2.initialize(travelsalPath, 5000);
-                        MapCleanerV2.gotoStartPoint('#4 s;#3 w');
+                        await MapCleanerV2.gotoStartPoint('#4 s;#3 w');
 
+                        MapCleanerV2.initialize(travelsalPath, 5000);
                         await MapCleanerV2.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -5333,9 +5309,9 @@ window.setTimeout(function () {
                     await ButtonManager.click('enforce 0');
                     this.innerText = '恢复加力';
                     this.style.color = 'red';
-                    this.title = '点击可开启当前最大加力 ' + GlobalUserInformation.getMaxEnforce();
+                    this.title = '点击可开启当前最大加力 ' + User.getMaxEnforce();
                 } else {
-                    await ButtonManager.click('enforce ' + GlobalUserInformation.getMaxEnforce());
+                    await ButtonManager.click('enforce ' + User.getMaxEnforce());
                     this.innerText = '取消加力';
                     this.style.color = 'black';
                     this.title = '点击可设置加力为 0';
@@ -5917,7 +5893,7 @@ window.setTimeout(function () {
 
     inintializeHelpButtons(helperConfigurations);
 
-    GlobalUserInformation.initialize();
+    User.initialize();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
