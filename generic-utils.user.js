@@ -4197,6 +4197,7 @@ window.setTimeout(function () {
         }, {
             label: '飞地图',
             title: '跑地图...',
+            hidden: true,
 
             eventOnClick () {
                 let message = '请输入：\n\n地图-目标（少林寺-达摩老祖）或者 地图-房间名（雪亭镇-山坳）';
@@ -4217,6 +4218,7 @@ window.setTimeout(function () {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater',
+            hidden: true,
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -4228,29 +4230,6 @@ window.setTimeout(function () {
                 } else {
                     JobManager.getJob(this.id).stop();
                 }
-            }
-        }, {
-            label: '逃跑叫杀',
-            title: '先逃跑再重新进入叫杀...',
-            id: 'id-escape-to-kill',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (!CombatStatus.inProgress()) {
-                        let actionLink = Objects.Npc.getActionLink('杀死');
-                        if (actionLink) {
-                            await EscapeToKillHelper.start(actionLink);
-                        } else {
-                            window.alert('未指定切磋对象，请点击在场 npc 的名字到杀死选项界面或在战斗中点此按钮。');
-                        }
-                    } else {
-                        await EscapeToKillHelper.start();
-                    }
-                }
-
-                ButtonManager.resetButtonById(this.id);
-                EscapeToKillHelper.stop();
-                await ButtonManager.click('prev_combat;golook_room', 0);
             }
         }, {
         }, {
@@ -4276,6 +4255,7 @@ window.setTimeout(function () {
             label: '检测状态',
             title: '自动检测状态...',
             id: 'id-auto-status-reset',
+            hidden: true,
 
             eventOnClick () {
                 ButtonManager.resetAllButtons();
@@ -4284,6 +4264,7 @@ window.setTimeout(function () {
             label: '帮战回位',
             title: '帮战挂了自动一键走回战场...',
             id: 'id-gan-fight-back',
+            hidden: true,
 
             async eventOnClick () {
                 await ClanCombatHelper.back();
@@ -5555,6 +5536,30 @@ window.setTimeout(function () {
                 } else {
                     TeamworkHelper.disableAutoKill();
                 }
+            }
+        }, {
+        }, {
+            label: '逃跑叫杀',
+            title: '先逃跑再重新进入叫杀...',
+            id: 'id-escape-to-kill',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (!CombatStatus.inProgress()) {
+                        let actionLink = Objects.Npc.getActionLink('杀死');
+                        if (actionLink) {
+                            await EscapeToKillHelper.start(actionLink);
+                        } else {
+                            window.alert('未指定切磋对象，请点击在场 npc 的名字到杀死选项界面或在战斗中点此按钮。');
+                        }
+                    } else {
+                        await EscapeToKillHelper.start();
+                    }
+                }
+
+                ButtonManager.resetButtonById(this.id);
+                EscapeToKillHelper.stop();
+                await ButtonManager.click('prev_combat;golook_room', 0);
             }
         }]
     }];
