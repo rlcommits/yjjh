@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.3
+// @version      2.1.4
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn:8086/*
@@ -2816,11 +2816,11 @@ window.setTimeout(function () {
             } else if (DragonMonitor._regKeywords.some(v => this._dragon.getBonus().match(v))) {
                 log('发现需要的目标：' + this._dragon.getBonus());
 
-                fire(this._dragon, DragonHelper.killDirectly);
+                await fire(this._dragon, DragonHelper.killDirectly);
             } else if (DragonHelper.observerMode(this._dragon)) {
                 log('发现需要观察的目标：' + this._dragon.getBonus());
 
-                fire(this._dragon, DragonHelper.observe);
+                await fire(this._dragon, DragonHelper.observe);
             } else {
                 log('没有在关注列表里的目标：' + this._dragon.getBonus());
             }
