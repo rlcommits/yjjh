@@ -63,80 +63,77 @@ window.setTimeout(function () {
         async initialize () {
             await ButtonManager.click('skills');
             await ButtonManager.click('prev');
-
             await ButtonManager.click('score');
-            if (Panels.Score.filterButtonObjectsByKeyword('不加力').length > 0) {
-                log('当前已加力。');
-                await Panels.Score.action('不加力');
-                log('测试不加力...');
-                await ExecutionManager.wait(300);
-                await Panels.Score.action('加力');
-                log('测试最大加力...');
-                $('#id-enforce').text('取消加力');
-                log('恢复最大加力。');
-                $('#id-enforce').attr('title', '点击可设置加力为 0');
-            } else {
-                log('当前未加力。');
-                await Panels.Score.action('加力');
-                log('测试最大加力...');
-                await ExecutionManager.wait(500);
-                await Panels.Score.action('不加力');
-                log('恢复不加力。');
-
-                $('#id-enforce').text('恢复加力');
-                $('#id-enforce').attr('title', '点击可开启当前最大加力 ' + User.getMaxEnforce());
-                $('#id-enforce').css('color', 'red');
-            }
-
             await ButtonManager.click('prev');
 
-            document.title = User.getNickName();
-        },
-
-        getSkillsEnabled (type = 'attack') {
-            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
-                if (!v['key'].includes('skill')) return false;
-                let info = Array.isArray(v['value']) ? v['value'] : v['value'].split(',');
-                return info[info.length - 3] === '1' && (!type || info[info.length - 4] === type);
-            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
-        },
-
-        getSkillsInUpgrading () {
-            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
-                let values = v['value'].split(',');
-                return values.length > 1 && (values[values.length - 1] === '4');
-            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
-        },
-
-        getSkillsInPractice () {
-            return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
-                let values = v['value'].split(',');
-                return values.length > 1 && (values[values.length - 1] === '1');
-            }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+            if (System.globalObjectMap.get('msg_attrs').get('force_factor')) {
+                $('#id-enforce').text('取消加力');
+            } else {
+                $('#id-enforce').text('恢复加力');
+                $('#id-enforce').css('color', 'red');
+            }
         },
 
         getNickName () {
             return System.globalObjectMap.get('msg_attrs').get('name');
         },
 
-        getMaxEnforce () {
-            return parseInt(System.globalObjectMap.get('msg_score').get('max_enforce'));
+        getArea () {
+            return System.globalObjectMap.get('msg_status').get('area');
         },
 
-        getMaxKee () {
-            return parseInt(System.globalObjectMap.get('msg_attrs').get('max_kee'));
+        getAreaRange () {
+            let area = parseInt(User.getArea());
+            let singleDigit = area % 10;
+            let tensDigit = Math.floor(area / 10);
+
+            return singleDigit > 5 ? tensDigit + '6-' + (tensDigit + 1) + '0' : tensDigit + '1-' + tensDigit + '5';
         },
 
-        getCurrentKee () {
-            return parseInt(System.globalObjectMap.get('msg_attrs').get('kee'));
+        attributes: {
+            getMaxEnforce () {
+                return parseInt(System.globalObjectMap.get('msg_score').get('max_enforce'));
+            },
+
+            getMaxKee () {
+                return parseInt(System.globalObjectMap.get('msg_attrs').get('max_kee'));
+            },
+
+            getCurrentKee () {
+                return parseInt(System.globalObjectMap.get('msg_attrs').get('kee'));
+            },
+
+            getCurrentForce () {
+                return parseInt(System.globalObjectMap.get('msg_attrs').get('force'));
+            },
+
+            getMaxForce () {
+                return parseInt(System.globalObjectMap.get('msg_attrs').get('max_force'));
+            }
         },
 
-        getCurrentForce () {
-            return parseInt(System.globalObjectMap.get('msg_attrs').get('force'));
-        },
+        skills: {
+            getSkillsEnabled (type = 'attack') {
+                return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
+                    if (!v['key'].includes('skill')) return false;
+                    let info = Array.isArray(v['value']) ? v['value'] : v['value'].split(',');
+                    return info[info.length - 3] === '1' && (!type || info[info.length - 4] === type);
+                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+            },
 
-        getMaxForce () {
-            return parseInt(System.globalObjectMap.get('msg_attrs').get('max_force'));
+            getSkillsInUpgrading () {
+                return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
+                    let values = v['value'].split(',');
+                    return values.length > 1 && (values[values.length - 1] === '4');
+                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+            },
+
+            getSkillsInPractice () {
+                return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
+                    let values = v['value'].split(',');
+                    return values.length > 1 && (values[values.length - 1] === '1');
+                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+            }
         }
     };
 
@@ -306,7 +303,7 @@ window.setTimeout(function () {
 
             await this.fight();
 
-            await ButtonManager.click('enforce ' + User.getMaxEnforce());
+            await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
         }
 
         async fight () {
@@ -314,7 +311,7 @@ window.setTimeout(function () {
                 ButtonManager.click('prev_combat;prev');
                 return true;
             } else if (PerformHelper.readyToPerform(3)) {
-                await PerformHelper.perform(User.getSkillsEnabled('attack')[0]);
+                await PerformHelper.perform(User.skills.getSkillsEnabled('attack')[0]);
             } else if (CombatStatus.justFinished()) {
                 ButtonManager.click('prev_combat;swords fight_test go');
             }
@@ -1163,7 +1160,7 @@ window.setTimeout(function () {
             let puppetName = Objects.Room.hasNpc('金甲符兵') ? '金甲符兵' : '玄阴符兵';
             await fight(puppetName, '比试');
 
-            await ButtonManager.click('enforce ' + User.getMaxEnforce());
+            await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
 
             async function fight (name, action, skills, additionalStopEvent) {
                 let combat = new Combat();
@@ -1532,7 +1529,7 @@ window.setTimeout(function () {
         },
 
         maximizeEnforce () {
-            ButtonManager.click(`enforce ${User.getMaxEnforce()}`, 0);
+            ButtonManager.click(`enforce ${User.attributes.getMaxEnforce()}`, 0);
         }
     };
 
@@ -1821,11 +1818,11 @@ window.setTimeout(function () {
             await RecoveryHelper._retry.initialize(async function recover () {
                 if (CombatStatus.inProgress()) return;
 
-                if (User.getCurrentKee() < User.getMaxKee()) {
+                if (User.attributes.getCurrentKee() < User.attributes.getMaxKee()) {
                     await ButtonManager.click('#3 recovery', 250);
                 }
 
-                if (User.getCurrentForce() < User.getMaxForce() * 0.9) {
+                if (User.attributes.getCurrentForce() < User.attributes.getMaxForce() * 0.9) {
                     await RecoveryHelper.recoverForce();
                 }
             }, function stopWhen () {
@@ -2154,13 +2151,13 @@ window.setTimeout(function () {
 
             getAvailableAttackSkills () {
                 let skillsAvailable = Panels.Combat.getAvailableSkills();
-                return User.getSkillsEnabled('attack').filter(v => skillsAvailable.includes(v));
+                return User.skills.getSkillsEnabled('attack').filter(v => skillsAvailable.includes(v));
             },
 
             getAvailableNonAttackSkills () {
                 let skillsAvailable = Panels.Combat.getAvailableSkills();
-                let dodges = User.getSkillsEnabled('recovery');
-                let forces = User.getSkillsEnabled('force');
+                let dodges = User.skills.getSkillsEnabled('recovery');
+                let forces = User.skills.getSkillsEnabled('force');
                 return dodges.concat(forces).filter(v => skillsAvailable.includes(v));
             },
 
@@ -2631,13 +2628,13 @@ window.setTimeout(function () {
 
         simpleToggleButtonEvent (button, toggleLabel = '') {
             if (button.innerText !== button.name) {
-                debugging('switching to simple toggle mode');
+                debugging('revert from simple toggle mode');
                 button.innerText = button.name;
                 button.style.color = '';
 
                 return false;
             } else {
-                debugging('revert from simple toggle mode');
+                debugging('switching to simple toggle mode');
                 button.innerText = toggleLabel || 'x ' + button.name;
                 button.style.color = 'red';
 
@@ -2702,7 +2699,8 @@ window.setTimeout(function () {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
         },
 
-        _REG_DRAGON_APPERS: '^青龙会组织：((\\[36\\-40区\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。',
+        _REG_DRAGON_APPERS: `^青龙会组织：((\\[${User.getAreaRange().replace('-', '\\-')}\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
+
         _regKeywords: User.getNickName() === '邱鸣' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
             '碎片',
             '斩龙宝镯'
@@ -2724,14 +2722,6 @@ window.setTimeout(function () {
         stop () {
             DragonMonitor._active = false;
             log('Dragon Monitor stopped.');
-        },
-
-        setInProgress (inProgress) {
-            DragonMonitor._inProgress = inProgress;
-        },
-
-        getInProgress () {
-            return DragonMonitor._inProgress;
         },
 
         getRegKeywords4ExcludedTargets () {
@@ -2838,8 +2828,6 @@ window.setTimeout(function () {
             MessageMonitor.enable();
 
             async function fire (dragon, action) {
-                DragonMonitor.setInProgress(true);
-
                 await ButtonManager.click(dragon.getLink(), 50);
                 let npcs = await DragonHelper.locateRoomInformation(dragon);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
@@ -2848,8 +2836,6 @@ window.setTimeout(function () {
 
                 debugging('战斗前在场 npc：' + npcs.map(v => v.getName()).join(','));
                 await Navigation.move('escape;prev;home');
-
-                DragonMonitor.setInProgress(false);
             }
         }
     };
@@ -2900,14 +2886,16 @@ window.setTimeout(function () {
             return Objects.Room.getPlayers().join(',');
         },
 
-        parseDragonInfo (matches, dragonLink) {
+        parseDragonInfo (matches) {
             let dragon = new Dragon();
             dragon.setAvailability(true);
             dragon.setEvil(matches[1]);
-            dragon.setRoom(matches[2]);
-            dragon.setBonus(matches[3]);
-            dragon.setCounter(parseInt(matches[4]));
-            dragon.setLink(dragonLink);
+            dragon.setBonus(matches[4]);
+            dragon.setCounter(parseInt(matches[6]));
+
+            let placeInfo = matches[3].split(';')[2].split('');
+            dragon.setRoom(placeInfo[1]);
+            dragon.setLink(placeInfo[0]);
 
             return dragon;
         },
@@ -2957,12 +2945,14 @@ window.setTimeout(function () {
         }
 
         handle () {
+            debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
+
             switch (this._message.get('type')) {
                 case 'main_msg':
-                    if (DragonMonitor.isActive() && !DragonMonitor.getInProgress()) {
+                    if (this._message.get('msg').includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
                         let dragonEvent = DragonHelper.identifyDragonEvent(this._message);
                         if (dragonEvent) {
-                            let dragon = DragonHelper.parseDragonInfo(dragonEvent, this._message.get('msg').split('href;0;')[1].split('')[0]);
+                            let dragon = DragonHelper.parseDragonInfo(dragonEvent);
                             debugging('dragon info identified:', dragon);
 
                             new DragonMessageHandler(dragon).handle();
@@ -3925,7 +3915,7 @@ window.setTimeout(function () {
         async prepare () {
             SnakeKiller._stop = false;
             await ButtonManager.click('score');
-            SnakeKiller._currentEnforce = User.getMaxEnforce();
+            SnakeKiller._currentEnforce = User.attributes.getMaxEnforce();
         },
 
         stop () {
@@ -4000,13 +3990,15 @@ window.setTimeout(function () {
         console.log(message);
     }
 
-    function debugging (message, func = null) {
+    function debugging (message = '', obj, func = null) {
         if (!System.debugMode) return;
 
         if (func) {
             console.debug('[Debug]', message, func());
+        } else if (obj) {
+            console.debug(`[Debug]${message}`, obj);
         } else {
-            console.debug('[Debug]', message);
+            console.debug(`[Debug]`, message);
         }
     }
 
@@ -4534,7 +4526,7 @@ window.setTimeout(function () {
                 }
 
                 ButtonManager.click(commands);
-                ButtonManager.click('auto_fight 0;enforce ' + User.getMaxEnforce());
+                ButtonManager.click('auto_fight 0;enforce ' + User.attributes.getMaxEnforce());
             }
         }, {
             label: '学',
@@ -5309,9 +5301,9 @@ window.setTimeout(function () {
                     await ButtonManager.click('enforce 0');
                     this.innerText = '恢复加力';
                     this.style.color = 'red';
-                    this.title = '点击可开启当前最大加力 ' + User.getMaxEnforce();
+                    this.title = '点击可开启当前最大加力 ' + User.attributes.getMaxEnforce();
                 } else {
-                    await ButtonManager.click('enforce ' + User.getMaxEnforce());
+                    await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
                     this.innerText = '取消加力';
                     this.style.color = 'black';
                     this.title = '点击可设置加力为 0';
@@ -5894,6 +5886,7 @@ window.setTimeout(function () {
     inintializeHelpButtons(helperConfigurations);
 
     User.initialize();
+    document.title = User.getNickName();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
