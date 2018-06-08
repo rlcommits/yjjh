@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.2
+// @version      2.1.3
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn:8086/*
@@ -2874,7 +2874,7 @@ window.setTimeout(function () {
         isTarget (npc) {
             let npcKee = parseInt(System.globalObjectMap.get('msg_vs_info').get('vs2_kee1'));
             if (npcKee > 1000 * 10000) {
-                debugging(npc.getName() + ' 血量为 ' + npcKee + ', 锁定青龙，加入战斗。', Panels.Combat.getCombatInfo);
+                debugging(npc.getName() + ' 血量为 ' + npcKee + ', 锁定青龙，加入战斗。', null, Panels.Combat.getCombatInfo);
                 return true;
             } else {
                 debugging(npc.getName() + ' 血量才 ' + npcKee + '，不是青龙果断放过。');
@@ -2908,7 +2908,7 @@ window.setTimeout(function () {
             await Objects.Npc.action(npc, '观战');
 
             for (let i = 0; i < 15; i++) {
-                debugging('战场信息：', Panels.Combat.getCombatInfo);
+                debugging('战场信息：', null, Panels.Combat.getCombatInfo);
                 await ExecutionManager.wait(500);
             }
         },
@@ -2945,6 +2945,8 @@ window.setTimeout(function () {
         }
 
         handle () {
+            if (this._message.get('type') === 'attrs_changed') return;
+
             debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
 
             switch (this._message.get('type')) {
