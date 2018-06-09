@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.5
+// @version      2.1.6
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -60,17 +60,34 @@ window.setTimeout(function () {
     };
 
     var User = {
+        _areaRange: '',
+
         async initialize () {
             await ButtonManager.click('skills');
             await ButtonManager.click('prev');
-            await ButtonManager.click('score');
-            await ButtonManager.click('prev');
 
-            if (System.globalObjectMap.get('msg_attrs').get('force_factor')) {
-                $('#id-enforce').text('取消加力');
-            } else {
-                $('#id-enforce').text('恢复加力');
-                $('#id-enforce').css('color', 'red');
+            User._areaRange = analyseAreaRange(User.getArea());
+
+            await analyseEnforce();
+
+            async function analyseEnforce () {
+                await ButtonManager.click('score');
+                await ButtonManager.click('prev');
+
+                if (System.globalObjectMap.get('msg_attrs').get('force_factor')) {
+                    $('#id-enforce').text('取消加力');
+                } else {
+                    $('#id-enforce').text('恢复加力');
+                    $('#id-enforce').css('color', 'red');
+                }
+            }
+
+            function analyseAreaRange (area) {
+                for (let start = 1, end = 5; start < 500; start += 5, end += 5) {
+                    if (area >= start && area <= end) {
+                        return start + '-' + end;
+                    }
+                }
             }
         },
 
@@ -79,17 +96,11 @@ window.setTimeout(function () {
         },
 
         getArea () {
-            return System.globalObjectMap.get('msg_status').get('area');
+            return parseInt(System.globalObjectMap.get('msg_status').get('area'));
         },
 
         getAreaRange () {
-            let area = parseInt(User.getArea());
-
-            for (let start = 1, end = 5; start < 500; start += 5, end += 5) {
-                if (area >= start && area <= end) {
-                    return start + '-' + end;
-                }
-            }
+            return User._areaRange;
         },
 
         attributes: {
@@ -2953,7 +2964,10 @@ window.setTimeout(function () {
 
             switch (this._message.get('type')) {
                 case 'main_msg':
-                    if (this._message.get('msg').includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
+                    let msg = this._message.get('msg');
+                    if (msg.includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
+                        if (msg.includes('[') && !msg.includes(User.getAreaRange())) return;
+
                         let dragonEvent = DragonHelper.identifyDragonEvent(this._message);
                         if (dragonEvent) {
                             let dragon = DragonHelper.parseDragonInfo(dragonEvent);
@@ -5225,7 +5239,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc?')) {
-                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;n;#3 w;#6 e'.split(';').extract();
+                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;#4 n'.split(';').extract();
                         await MapCleanerV2.gotoStartPoint('#4 s;#3 w');
 
                         MapCleanerV2.initialize(travelsalPath, 5000);
