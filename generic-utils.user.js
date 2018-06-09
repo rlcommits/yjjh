@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.4
+// @version      2.1.5
 // @description  just to make the game eaiser!
 // @author       RL
-// @include      http://sword-direct*.yytou.cn:8086/*
+// @include      http://sword-direct*.yytou.cn*
 // @run-at       document-idle
 // @grant        unsafeWindow
 // @grant        GM_setValue
@@ -84,10 +84,12 @@ window.setTimeout(function () {
 
         getAreaRange () {
             let area = parseInt(User.getArea());
-            let singleDigit = area % 10;
-            let tensDigit = Math.floor(area / 10);
 
-            return singleDigit > 5 ? tensDigit + '6-' + (tensDigit + 1) + '0' : tensDigit + '1-' + tensDigit + '5';
+            for (let start = 1, end = 5; start < 500; start += 5, end += 5) {
+                if (area >= start && area <= end) {
+                    return start + '-' + end;
+                }
+            }
         },
 
         attributes: {
@@ -4283,6 +4285,92 @@ window.setTimeout(function () {
             }
         }]
     }, {
+        subject: '测试中功能',
+
+        buttons: [{
+            label: '飞地图',
+            title: '跑地图...',
+
+            eventOnClick () {
+                let message = '请输入：\n\n地图-目标（少林寺-达摩老祖）或者 地图-房间名（雪亭镇-山坳）';
+                let answer = window.prompt(message);
+
+                if (answer) {
+                    let info = answer.split('-');
+                    let city = info[0];
+                    let target = info[1];
+                    if (PathManager.getTraversalPathByCity(city)) {
+                        Navigation.traversal(city, target);
+                    } else {
+                        log('没有合适的地图：' + city);
+                    }
+                }
+            }
+        }, {
+            label: '一直重复',
+            title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
+            id: 'id-repeater',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (Repeater.confirmAction()) {
+                        JobManager.getJob(this.id).start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    JobManager.getJob(this.id).stop();
+                }
+            }
+        }, {
+        }, {
+            label: '抢杀',
+            title: '抢杀某个指定目标...',
+            id: 'id-killer',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    let name = window.prompt('请输入要杀的目标名字。');
+                    if (name) {
+                        KillerHelper.setTarget(name);
+                        JobManager.getJob(this.id).start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    JobManager.getJob(this.id).stop();
+                }
+            }
+        }, {
+            label: '检测状态',
+            title: '自动检测状态...',
+            id: 'id-auto-status-reset',
+            hidden: true,
+
+            eventOnClick () {
+                ButtonManager.resetAllButtons();
+            }
+        }, {
+            label: '帮战回位',
+            title: '帮战挂了自动一键走回战场...',
+            id: 'id-gan-fight-back',
+            hidden: true,
+
+            async eventOnClick () {
+                await ClanCombatHelper.back();
+            }
+        }, {
+        }, {
+            label: '自动跟招',
+            title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
+            id: 'id-auto-follower-best-skill',
+            hidden: true,
+
+            eventOnClick () {
+                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+            }
+        }]
+    }, {
         subject: '寻路',
 
         buttons: [{
@@ -5888,6 +5976,7 @@ window.setTimeout(function () {
         HelperUiManager.drawMasterSwitch();
 
         $('#id-leftover-tasks').click();
+        $('#测试中功能').click();
     }
 
     inintializeHelpButtons(helperConfigurations);
