@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.6
+// @version      2.1.7
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1449,8 +1449,11 @@ window.setTimeout(function () {
                     }
                 }
 
-                let msToWait = 5010 - (new Date() - start);
-                if (msToWait > 0) await ExecutionManager.wait(msToWait);
+                if (this._candidates.length) {
+                    let msToWait = 5010 - (new Date() - start);
+                    if (msToWait > 0) await ExecutionManager.wait(msToWait);
+                }
+
                 return this.fire();
             }
         }
@@ -2464,11 +2467,11 @@ window.setTimeout(function () {
     };
 
     var MapCleanerV2 = {
-        _retry: new Retry(500),
+        _retry: new Retry(100),
         _path: [],
         _stop: false,
 
-        initialize (travelsalPath = [], interval = 3000) {
+        initialize (travelsalPath = [], interval = 2500) {
             MapCleanerV2._stop = false;
             MapCleanerV2._path = travelsalPath;
 
@@ -2516,8 +2519,8 @@ window.setTimeout(function () {
                 if (npcs.length) {
                     let combat = new Combat();
                     combat.initialize(npcs[0], '杀死');
-                    await combat.fire();
                     $('#id-body-search').click();
+                    await combat.fire();
 
                     await ExecutionManager.wait(1200);
                 }
@@ -5238,10 +5241,16 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (window.confirm('确定开始按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc?')) {
-                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;#4 n'.split(';').extract();
+                    if (Objects.Room.getName() !== '幽荧殿') {
+                        window.alert('目前本功能只支持从森林起点幽荧殿开始。');
+                        ButtonManager.resetButtonById(this.id);
+                        return;
+                    }
+
+                    if (window.confirm('确定开始按既定路径（4层->3层->2层->1层 自动寻找路径并叫杀 npc?')) {
                         await MapCleanerV2.gotoStartPoint('#4 s;#3 w');
 
+                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;#4 n'.split(';').extract();
                         MapCleanerV2.initialize(travelsalPath, 5000);
                         await MapCleanerV2.start();
                     } else {
