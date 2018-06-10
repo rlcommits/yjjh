@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.7
+// @version      2.1.8
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1449,10 +1449,8 @@ window.setTimeout(function () {
                     }
                 }
 
-                if (this._candidates.length) {
-                    let msToWait = 5010 - (new Date() - start);
-                    if (msToWait > 0) await ExecutionManager.wait(msToWait);
-                }
+                let msToWait = this._candidates.length ? 5010 - (new Date() - start) : 500;
+                await ExecutionManager.wait(msToWait);
 
                 return this.fire();
             }
