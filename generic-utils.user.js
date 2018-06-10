@@ -63,20 +63,14 @@ window.setTimeout(function () {
         _areaRange: '',
 
         async initialize () {
-            await ButtonManager.click('skills;prev');
-            await ButtonManager.click('team;prev');
-            await ButtonManager.click('friend;prev');
+            await ButtonManager.click('skills;team;friend;score;#4 prev');
 
             User._areaRange = analyseAreaRange(User.getArea());
 
             await analyseEnforce();
 
             async function analyseEnforce () {
-                if (!System.globalObjectMap.get('msg_attrs')) {
-                    await ButtonManager.click('score;prev');
-                }
-
-                if (System.globalObjectMap.get('msg_attrs').get('force_factor')) {
+                if (parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'))) {
                     $('#id-enforce').text('取消加力');
                 } else {
                     $('#id-enforce').text('恢复加力');
@@ -3722,14 +3716,6 @@ window.setTimeout(function () {
         }
     };
 
-    var MurderProtector = {
-        check () {
-            if (Panels.Notices.getLastMessage().match('你对著.*?喝道：老子看你实在不顺眼，去死吧')) {
-                $('#id-escape').click();
-            }
-        }
-    };
-
     var AutoFollower = {
         _autoEscape: false,
         _autoFight: false,
@@ -4072,8 +4058,8 @@ window.setTimeout(function () {
         }
     };
 
-    function log (message) {
-        console.log(message);
+    function log (message, object) {
+        object ? console.log(message, object) : console.log(message);
     }
 
     function debugging (message = '', obj, func = null) {
@@ -4118,8 +4104,6 @@ window.setTimeout(function () {
     JobManager.register('id-escape', 200, EscapeHelper.escape);
 
     JobManager.register('id-repeater', 200, Repeater.fire);
-
-    JobManager.register('id-murder-protector', 200, MurderProtector.check);
 
     JobManager.register('id-auto-follower', 200, AutoFollower.check);
     JobManager.register('id-auto-follower-best-skill', 200, AutoFollower.performComboSkill);
@@ -5474,7 +5458,7 @@ window.setTimeout(function () {
                     await ButtonManager.click('enforce 0');
                     this.innerText = '恢复加力';
                     this.style.color = 'red';
-                    this.title = '点击可开启当前最大加力 ' + User.attributes.getMaxEnforce();
+                    this.title = '点击可开启当前最大加力' + User.attributes.getMaxEnforce();
                 } else {
                     await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
                     this.innerText = '取消加力';
