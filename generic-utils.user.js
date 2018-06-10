@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.9
+// @version      2.1.10
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1193,11 +1193,11 @@ window.setTimeout(function () {
         },
 
         setKeyKnight (name) {
-            KnightManager._keyKnightName = name;
+            UserConfigurationManager.saveConfiguration('keyNightName', name);
         },
 
         getKeyKnight () {
-            return KnightManager._keyKnightName;
+            return UserConfigurationManager.readConfiguration('keyNightName');
         },
 
         async capture (name) {
@@ -2503,6 +2503,18 @@ window.setTimeout(function () {
         }
     };
 
+    var UserConfigurationManager = {
+        _uid: User.getId(),
+
+        saveConfiguration (key, value) {
+            window.GM_setValue(`${UserConfigurationManager._uid}.${key}`, value);
+        },
+
+        readConfiguration (key) {
+            return window.GM_getValue(`${UserConfigurationManager._uid}.${key}`);
+        }
+    };
+
     var ClanCombatHelper = {
         _place: '',
 
@@ -2766,15 +2778,6 @@ window.setTimeout(function () {
 
         _REG_DRAGON_APPERS: `^青龙会组织：((\\[${User.getAreaRange().replace('-', '\\-')}\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
-        _regKeywords: User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
-            '碎片',
-            '斩龙宝镯'
-        ],
-
-        _regKeywords4ExcludedTargets: User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : [
-            '轩辕剑碎片', '破岳'
-        ],
-
         isActive () {
             return DragonMonitor._active;
         },
@@ -2790,11 +2793,12 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            return DragonMonitor._regKeywords4ExcludedTargets;
+            let existingSetting = UserConfigurationManager.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets');
+            return existingSetting || (User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : ['轩辕剑碎片', '破岳']);
         },
 
         setRegKeywords4ExcludedTargets (regKeywords4ExcludedTargets) {
-            DragonMonitor._regKeywords4ExcludedTargets = regKeywords4ExcludedTargets;
+            UserConfigurationManager.saveConfiguration('dragonMonitorRegKeywords4ExcludedTargets', regKeywords4ExcludedTargets);
         },
 
         getKillBadPeople () {
@@ -2806,11 +2810,12 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            return DragonMonitor._regKeywords;
+            let existingSetting = UserConfigurationManager.readConfiguration('dragonMonitorRegKeyWords');
+            return existingSetting || (User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '小李飞刀'] : ['碎片', '斩龙宝镯']);
         },
 
         setRegKeywords (regKeywords) {
-            DragonMonitor._regKeywords = regKeywords;
+            UserConfigurationManager.saveConfiguration('dragonMonitorRegKeyWords', regKeywords);
         }
     };
 
@@ -4757,7 +4762,7 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '包',
+            label: '整',
             title: '一键卖掉分解背包里不需要的垃圾...',
             width: '38px',
 
@@ -5052,7 +5057,7 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '撩奇侠',
+            label: KnightManager.getKeyKnight() ? `撩${KnightManager.getKeyKnight().substr(0, 2)}` : '撩奇侠',
             title: '平民版撩奇侠（当前奇侠目标未设定）增加好感度\n\n免小号：放茅山道术招小弟->逃跑->和奇侠群殴小弟',
             id: 'id-please-knight',
             width: '60px',
