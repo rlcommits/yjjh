@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.8
+// @version      2.1.9
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -63,16 +63,18 @@ window.setTimeout(function () {
         _areaRange: '',
 
         async initialize () {
-            await ButtonManager.click('skills');
-            await ButtonManager.click('prev');
+            await ButtonManager.click('skills;prev');
+            await ButtonManager.click('team;prev');
+            await ButtonManager.click('friend;prev');
 
             User._areaRange = analyseAreaRange(User.getArea());
 
             await analyseEnforce();
 
             async function analyseEnforce () {
-                await ButtonManager.click('score');
-                await ButtonManager.click('prev');
+                if (!System.globalObjectMap.get('msg_attrs')) {
+                    await ButtonManager.click('score;prev');
+                }
 
                 if (System.globalObjectMap.get('msg_attrs').get('force_factor')) {
                     $('#id-enforce').text('取消加力');
@@ -93,6 +95,10 @@ window.setTimeout(function () {
 
         getNickName () {
             return System.globalObjectMap.get('msg_attrs').get('name');
+        },
+
+        getId () {
+            return System.globalObjectMap.get('msg_attrs').get('id');
         },
 
         getArea () {
@@ -1071,6 +1077,9 @@ window.setTimeout(function () {
 
     var TeamworkHelper = {
         _autoKill: false,
+        _leadMode: false,
+        _teamLeadName: User.getId().match('u3390622|u4237584|4234800') ? '皮宪泰' : '',
+        _teamLeadId: User.getId().match('u3390622|u4237584|4234800') ? 'u4223921' : '',
 
         enableAutoKill () {
             TeamworkHelper._autoKill = true;
@@ -1078,6 +1087,44 @@ window.setTimeout(function () {
 
         disableAutoKill () {
             TeamworkHelper._autoKill = false;
+        },
+
+        setLeadMode (leadMode) {
+            TeamworkHelper._leadMode = leadMode;
+        },
+
+        isInLeadMode () {
+            return this._leadMode;
+        },
+
+        async createTeamIfNeeded () {
+            if (!System.globalObjectMap.get('msg_team').get('team_id')) {
+                if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
+                    ButtonManager.resetButtonById('id-team-lead');
+                    return;
+                }
+
+                await ButtonManager.click('team create;prev');
+            }
+        },
+
+        identifyTeamLeadName (teamLeadName) {
+            let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`,${teamLeadName},`));
+            if (targetUser.length) {
+                let userInfo = targetUser[0]['value'].split(',');
+
+                TeamworkHelper._teamLeadName = userInfo[1];
+                TeamworkHelper._teamLeadId = userInfo[0];
+                return true;
+            }
+        },
+
+        getTeamLeadName () {
+            return TeamworkHelper._teamLeadName;
+        },
+
+        getTeamLeadId () {
+            return TeamworkHelper._teamLeadId;
         },
 
         async move (direction) {
@@ -1114,6 +1161,10 @@ window.setTimeout(function () {
                     }
                 }
             }
+        },
+
+        requestToJoin () {
+            ButtonManager.click(`team join ${TeamworkHelper.getTeamLeadId()}`);
         }
     };
 
@@ -2715,12 +2766,12 @@ window.setTimeout(function () {
 
         _REG_DRAGON_APPERS: `^青龙会组织：((\\[${User.getAreaRange().replace('-', '\\-')}\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
-        _regKeywords: User.getNickName() === '邱鸣' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
+        _regKeywords: User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '斩龙宝镯', '小李飞刀'] : [
             '碎片',
             '斩龙宝镯'
         ],
 
-        _regKeywords4ExcludedTargets: User.getNickName() === '邱鸣' ? ['天寒', '残雪', '明月'] : [
+        _regKeywords4ExcludedTargets: User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : [
             '轩辕剑碎片', '破岳'
         ],
 
@@ -2948,8 +2999,7 @@ window.setTimeout(function () {
         },
 
         isEnabled () {
-            return ButtonManager.isButtonPressed('id-dragon-monitor-kill-good') ||
-                ButtonManager.isButtonPressed('id-dragon-monitor-kill-bad');
+            return DragonMonitor.isActive() || TeamworkHelper.isInLeadMode();
         }
     };
 
@@ -2976,6 +3026,15 @@ window.setTimeout(function () {
 
                             new DragonMessageHandler(dragon).handle();
                         }
+                    }
+
+                    break;
+                case 'prompt':
+                    if (TeamworkHelper.isInLeadMode() && this._message.get('msg').includes('想要加入你的队伍。')) {
+                        let msgTeam = System.globalObjectMap.get('msg_team');
+                        if (msgTeam.get('member_num') === msgTeam.get('max_member_num')) return;
+
+                        ButtonManager.click(this._message.get('cmd1'), 0);
                     }
             }
         }
@@ -5459,19 +5518,56 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: TeamworkHelper.getTeamLeadName() ? `加${TeamworkHelper.getTeamLeadName().substr(0, 1)}队` : '加队伍',
+            title: '一键向设定好的队长发起组队请求\n\n注意：\n队长必须在“将”模式开启情况下才能自动批准入队',
+            id: 'id-join-team',
+            width: '60px',
+            marginRight: '1px',
+
+            eventOnClick () {
+                if (TeamworkHelper.getTeamLeadId()) {
+                    TeamworkHelper.requestToJoin();
+                } else {
+                    $('#id-join-team-setting').click();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置常用队长名字...\n\n注意：\n1. 必须是好友\n2. 暂不支持跨服组队\n3. 暂不支持浏览器刷新后读旧值',
+            id: 'id-join-team-setting',
+            width: '10px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入常用队长名字：\n\n注意：\n1. 必须是好友\n2. 目前尚不支持浏览器刷新后读旧值', TeamworkHelper.getTeamLeadName());
+                if (!answer) return;
+
+                if (!await TeamworkHelper.identifyTeamLeadName(answer)) {
+                    window.alert(`当前好友列表里找不到名字为 ${answer} 的好友，请检查拼写。`);
+                    return;
+                }
+
+                let teamLeadNameAbbr = answer.substr(0, 1);
+                $('#id-join-team').text(`加${teamLeadNameAbbr}队`);
+            }
+        }, {
             label: '将',
-            title: '队长模式',
+            title: '队长模式\n\n注意：\n1. 开启本模式会自动激活群殴相关功能\n2. 开启本模式会监听组队请求并自动批准',
             id: 'id-team-lead',
             width: '38px',
             marginRight: '1px',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    ButtonManager.resetButtonById('id-team-member');
+                    await TeamworkHelper.createTeamIfNeeded();
 
+                    TeamworkHelper.setLeadMode(true);
+
+                    ButtonManager.resetButtonById('id-team-member');
                     ButtonManager.pressDown('id-recover-hp-mp');
                     ButtonManager.pressDown('id-auto-follower-fight');
                 } else {
+                    TeamworkHelper.setLeadMode(false);
+
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     ButtonManager.resetButtonById('id-auto-follower-fight');
                 }
