@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.13
+// @version      2.1.14
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -53,9 +53,26 @@ window.setTimeout(function () {
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
         debugMode: false,
+        _uid: '',
 
         replaceControlCharBlank (valueWithColor) {
             return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
+        },
+
+        _initializeUid () {
+            if (!System._uid) System._uid = User.getId();
+        },
+
+        saveConfiguration (key, value) {
+            System._initializeUid();
+
+            window.GM_setValue(`${System._uid}.${key}`, value);
+        },
+
+        readConfiguration (key) {
+            System._initializeUid();
+
+            return window.GM_getValue(`${System._uid}.${key}`);
         }
     };
 
@@ -1105,19 +1122,19 @@ window.setTimeout(function () {
             if (targetUser.length) {
                 let userInfo = targetUser[0]['value'].split(',');
 
-                UserConfigurationManager.saveConfiguration('teamLeadName', userInfo[1]);
-                UserConfigurationManager.saveConfiguration('teamLeadId', userInfo[0]);
+                System.saveConfiguration('teamLeadName', userInfo[1]);
+                System.saveConfiguration('teamLeadId', userInfo[0]);
 
                 return true;
             }
         },
 
         getTeamLeadName () {
-            return UserConfigurationManager.readConfiguration('teamLeadName');
+            return System.readConfiguration('teamLeadName');
         },
 
         getTeamLeadId () {
-            return UserConfigurationManager.readConfiguration('teamLeadId');
+            return System.readConfiguration('teamLeadId');
         },
 
         async move (direction) {
@@ -1186,11 +1203,11 @@ window.setTimeout(function () {
         },
 
         setKeyKnight (name) {
-            UserConfigurationManager.saveConfiguration('keyNightName', name);
+            System.saveConfiguration('keyNightName', name);
         },
 
         getKeyKnight () {
-            return UserConfigurationManager.readConfiguration('keyNightName');
+            return System.readConfiguration('keyNightName');
         },
 
         async capture (name) {
@@ -2498,18 +2515,6 @@ window.setTimeout(function () {
         }
     };
 
-    var UserConfigurationManager = {
-        _uid: User.getId(),
-
-        saveConfiguration (key, value) {
-            window.GM_setValue(`${UserConfigurationManager._uid}.${key}`, value);
-        },
-
-        readConfiguration (key) {
-            return window.GM_getValue(`${UserConfigurationManager._uid}.${key}`);
-        }
-    };
-
     var ClanCombatHelper = {
         _place: '',
 
@@ -2788,12 +2793,12 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            let existingSetting = UserConfigurationManager.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets');
+            let existingSetting = System.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets');
             return existingSetting || (User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : ['轩辕剑碎片', '破岳']);
         },
 
         setRegKeywords4ExcludedTargets (regKeywords4ExcludedTargets) {
-            UserConfigurationManager.saveConfiguration('dragonMonitorRegKeywords4ExcludedTargets', regKeywords4ExcludedTargets);
+            System.saveConfiguration('dragonMonitorRegKeywords4ExcludedTargets', regKeywords4ExcludedTargets);
         },
 
         getKillBadPeople () {
@@ -2805,12 +2810,12 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            let existingSetting = UserConfigurationManager.readConfiguration('dragonMonitorRegKeyWords');
+            let existingSetting = System.readConfiguration('dragonMonitorRegKeyWords');
             return existingSetting || (User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '小李飞刀'] : ['碎片', '斩龙宝镯']);
         },
 
         setRegKeywords (regKeywords) {
-            UserConfigurationManager.saveConfiguration('dragonMonitorRegKeyWords', regKeywords);
+            System.saveConfiguration('dragonMonitorRegKeyWords', regKeywords);
         }
     };
 
@@ -5541,12 +5546,12 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置常用队长名字...\n\n注意：\n1. 必须是好友\n2. 暂不支持跨服组队\n3. 暂不支持浏览器刷新后读旧值',
+            title: '设置常用队长名字...\n\n注意：\n1. 必须是好友\n2. 暂不支持跨服组队',
             id: 'id-join-team-setting',
             width: '10px',
 
             async eventOnClick () {
-                let answer = window.prompt('请输入常用队长名字：\n\n注意：\n1. 必须是好友\n2. 目前尚不支持浏览器刷新后读旧值', TeamworkHelper.getTeamLeadName());
+                let answer = window.prompt('请输入常用队长名字：\n\n注意：必须是好友', TeamworkHelper.getTeamLeadName());
                 if (!answer) return;
 
                 if (!await TeamworkHelper.identifyTeamLeadName(answer)) {
