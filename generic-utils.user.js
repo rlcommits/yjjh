@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.10
+// @version      2.1.11
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -972,7 +972,7 @@ window.setTimeout(function () {
             '天寒手镯', '天寒戒', '天寒项链',
             '钢剑', '长剑', '单刀', '竹剑', '匕首', '鬼头刀', '长鞭', '木棍', '逆钩匕', '羊角匕', '木刀', '木叉', '木锤', '金刚杖',
             '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
-            '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤',
+            '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
             '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
             '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲',
             '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙',
@@ -1078,8 +1078,6 @@ window.setTimeout(function () {
     var TeamworkHelper = {
         _autoKill: false,
         _leadMode: false,
-        _teamLeadName: User.getId().match('u3390622|u4237584|4234800') ? '皮宪泰' : '',
-        _teamLeadId: User.getId().match('u3390622|u4237584|4234800') ? 'u4223921' : '',
 
         enableAutoKill () {
             TeamworkHelper._autoKill = true;
@@ -1113,18 +1111,19 @@ window.setTimeout(function () {
             if (targetUser.length) {
                 let userInfo = targetUser[0]['value'].split(',');
 
-                TeamworkHelper._teamLeadName = userInfo[1];
-                TeamworkHelper._teamLeadId = userInfo[0];
+                UserConfigurationManager.saveConfiguration('teamLeadName', userInfo[1]);
+                UserConfigurationManager.saveConfiguration('teamLeadId', userInfo[0]);
+
                 return true;
             }
         },
 
         getTeamLeadName () {
-            return TeamworkHelper._teamLeadName;
+            return UserConfigurationManager.readConfiguration('teamLeadName');
         },
 
         getTeamLeadId () {
-            return TeamworkHelper._teamLeadId;
+            return UserConfigurationManager.readConfiguration('teamLeadId');
         },
 
         async move (direction) {
@@ -3453,6 +3452,7 @@ window.setTimeout(function () {
                     '扬州-十里长街6': 'jh 5;#8 n',
                     '扬州-虹桥': 'jh 5;#8 n;w',
                     '扬州-东关街': 'jh 5;#9 n;e',
+                    '扬州-武庙': 'jh 5;#6 n;w',
                     '丐帮-储藏室': 'jh 6;event_1_98623439;s',
                     '丐帮-暗道': 'jh 6;event_1_98623439;ne;ne',
                     '乔阴县-福林大街': {
@@ -3511,6 +3511,9 @@ window.setTimeout(function () {
                     '逍遥林-湖边': 'jh 16;#4 s;e;n;e;event_1_5221690;s;w',
                     '逍遥林-打铁屋': 'jh 16;#4 s;e;e;s;#4 w;n',
                     '逍遥林-工匠屋': 'jh 16;#4 s;e;e;s;w;s;s',
+                    '逍遥林-林间小道': {
+                        '石师妹': 'jh 16;#4 s;e;e;s;w;n;s;w;n'
+                    },
                     '开封-羊肠小道': 'jh 17;event_1_97081006',
                     '开封-*野猪林*-杂草小路': 'jh 17;event_1_97081006;#5 s;w',
                     '开封-朱雀门': 'jh 17',
@@ -4467,9 +4470,13 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     await Navigation.move('jh 1;e;#4 n;w;event_1_36344468');
+                    await ExecutionManager.wait(1000);
+
+                    document.title = User.getNickName() + '-跨服';
                     $('#id-equipment-for-combat').click();
                 } else {
                     await Navigation.move('home;home;home;home');
+                    document.title = User.getNickName();
                 }
             }
         }, {
