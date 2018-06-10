@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.12
+// @version      2.1.13
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1932,6 +1932,8 @@ window.setTimeout(function () {
         },
 
         check () {
+            if (!CombatStatus.inProgress()) return;
+
             if (CombatHelper._autoRecovery) {
                 RecoveryHelper.recoverBySkill();
             }
