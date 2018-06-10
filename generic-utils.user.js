@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.11
+// @version      2.1.12
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1660,7 +1660,7 @@ window.setTimeout(function () {
                 await Navigation.move(PathManager.getPathForSpecificEvent('钓鱼加玄铁'));
             }
 
-            await ButtonManager.resetButtonById('id-fishing');
+            if (Objects.Room.getName() === '冰湖') ButtonManager.resetButtonById('id-escape');
 
             async function mapLocked () {
                 await ButtonManager.click('jh 35');
@@ -4469,7 +4469,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    await Navigation.move('jh 1;e;#4 n;w;event_1_36344468');
+                    if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
+
+                    await ButtonManager.click('event_1_36344468');
                     await ExecutionManager.wait(1000);
 
                     document.title = User.getNickName() + '-跨服';
@@ -4911,13 +4913,21 @@ window.setTimeout(function () {
             width: '38px',
 
             async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this) && window.confirm('确定去钓鱼? ')) {
-                    await FishingManager.gotoTarget();
-                    JobManager.getJob(this.id).start();
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    let decision = true;
+                    if (Objects.Room.getName() !== '冰湖') {
+                        if (window.confirm('确定去钓鱼? ')) {
+                            await FishingManager.gotoTarget();
+                        } else {
+                            decision = false;
+                            ButtonManager.resetButtonById(this.id);
+                        }
+                    }
+
+                    if (decision) JobManager.getJob(this.id).start();
                 } else {
                     JobManager.getJob(this.id).stop();
-                    await ButtonManager.resetButtonById(this.id);
-                    await ButtonManager.resetButtonById('id-escape');
+                    ButtonManager.resetButtonById(this.id);
                 }
             }
         }, {
@@ -5149,7 +5159,7 @@ window.setTimeout(function () {
                     await ButtonManager.click('golook_room');
                     if (!Objects.Room.isSecurePlace()) {
                         window.alert('当前不在秘境里');
-                        await ButtonManager.resetButtonById(this.id);
+                        ButtonManager.resetButtonById(this.id);
                         return;
                     }
 
