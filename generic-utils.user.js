@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.16
+// @version      2.1.17
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -2908,7 +2908,7 @@ window.setTimeout(function () {
             MessageMonitor.enable();
 
             async function fire (dragon, action) {
-                await ButtonManager.click(dragon.getLink(), 50);
+                ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
                 let npcs = await DragonHelper.locateRoomInformation(dragon);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
 
@@ -2930,11 +2930,14 @@ window.setTimeout(function () {
             let npcs = Objects.Room.getAvailableNpcsV2(target, true);
             debugging('在场玩家：', null, DragonHelper.getUserList);
 
+            let start = new Date().getTime();
             while (!npcs.length) {
                 debugging('房间信息未刷新，等待并重新刷新检测 - ', Objects.Room.getName);
                 await ExecutionManager.wait(20);
                 npcs = Objects.Room.getAvailableNpcsV2(target, true);
                 debugging('在场玩家：', null, DragonHelper.getUserList);
+
+                if (new Date().getTime() - start > 20000) break;
             }
 
             return npcs;
