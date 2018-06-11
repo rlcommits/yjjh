@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.14
+// @version      2.1.15
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1686,7 +1686,7 @@ window.setTimeout(function () {
                 ButtonManager.click('#5 shop money_buy shop5_N_10;#5 shop money_buy shop6_N_10;diaoyu');
             } else if (message.match(FishingManager._REG_FISH_OVER)) {
                 FishingManager.stopFishing();
-                ButtonManager.resetButtonById('id-escape');
+                ButtonManager.resetButtonById('id-fishing');
             }
 
             ButtonManager.click('diaoyu', 0);
@@ -2736,7 +2736,7 @@ window.setTimeout(function () {
         },
 
         resetButtonById (buttonId) {
-            let button = $('#' + buttonId);
+            let button = buttonId.includes('#') ? $(buttonId) : $('#' + buttonId);
             if (button.css('color') !== 'rgb(0, 0, 0)') button.click();
         },
 
@@ -2881,9 +2881,9 @@ window.setTimeout(function () {
         async handle () {
             MessageMonitor.disable();
 
-            if (DragonMonitor._regKeywords4ExcludedTargets.some(v => this._dragon.getBonus().match(v))) {
+            if (System.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets').some(v => this._dragon.getBonus().match(v))) {
                 log('指定过滤掉不抢的目标：' + this._dragon.getBonus());
-            } else if (DragonMonitor._regKeywords.some(v => this._dragon.getBonus().match(v))) {
+            } else if (System.readConfiguration('dragonMonitorRegKeyWords').some(v => this._dragon.getBonus().match(v))) {
                 log('发现需要的目标：' + this._dragon.getBonus());
 
                 await fire(this._dragon, DragonHelper.killDirectly);
@@ -2971,7 +2971,7 @@ window.setTimeout(function () {
         },
 
         observerMode (dragon) {
-            return DragonMonitor._regKeywords.some(v => dragon.getBonus().match(v.replace(/"/g, '')));
+            return System.readConfiguration('dragonMonitorRegKeyWords').some(v => dragon.getBonus().match(v.replace(/"/g, '')));
         },
 
         async observe (npc) {
