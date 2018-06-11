@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.15
+// @version      2.1.16
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -73,6 +73,10 @@ window.setTimeout(function () {
             System._initializeUid();
 
             return window.GM_getValue(`${System._uid}.${key}`);
+        },
+
+        isLocalServer () {
+            return User.getArea() > 1000;
         }
     };
 
@@ -2793,12 +2797,15 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            let existingSetting = System.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets');
-            return existingSetting || (User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : ['轩辕剑碎片', '破岳']);
+            let key = System.isLocalServer() ? 'dragonMonitorRegKeywords4ExcludedTargets' : 'dragonMonitorRegKeywords4ExcludedTargets.remote';
+
+            return System.readConfiguration(key) || (User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : ['轩辕剑碎片', '破岳']);
         },
 
         setRegKeywords4ExcludedTargets (regKeywords4ExcludedTargets) {
-            System.saveConfiguration('dragonMonitorRegKeywords4ExcludedTargets', regKeywords4ExcludedTargets);
+            let key = System.isLocalServer() ? 'dragonMonitorRegKeywords4ExcludedTargets' : 'dragonMonitorRegKeywords4ExcludedTargets.remote';
+
+            System.saveConfiguration(key, regKeywords4ExcludedTargets);
         },
 
         getKillBadPeople () {
@@ -2810,12 +2817,15 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            let existingSetting = System.readConfiguration('dragonMonitorRegKeyWords');
-            return existingSetting || (User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '小李飞刀'] : ['碎片', '斩龙宝镯']);
+            let key = System.isLocalServer() ? 'dragonMonitorRegKeyWords' : 'dragonMonitorRegKeyWords.remote';
+
+            return System.readConfiguration(key) || (User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '小李飞刀'] : ['碎片', '斩龙宝镯']);
         },
 
         setRegKeywords (regKeywords) {
-            System.saveConfiguration('dragonMonitorRegKeyWords', regKeywords);
+            let key = System.isLocalServer() ? 'dragonMonitorRegKeyWords' : 'dragonMonitorRegKeyWords.remote';
+
+            System.saveConfiguration(key, regKeywords);
         }
     };
 
