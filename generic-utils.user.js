@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.17
+// @version      2.1.18
 // @description  just to make the game eaiser!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1183,12 +1183,11 @@ window.setTimeout(function () {
     };
 
     var KnightManager = {
-        _keyKnightName: '',
         _puppetSkills: ['茅山道术', '天师灭神剑'],
         _REG_SECRET_TREASURE: '.*?对你悄声道：你现在去(.*?)，.*?',
 
         async detectUserSettings () {
-            KnightManager._keyKnightName = await detectKeyKnight();
+            System.saveConfiguration('keyKnightName', await detectKeyKnight());
 
             await detectSkills();
             await detectKeyKnight();
@@ -1207,11 +1206,13 @@ window.setTimeout(function () {
         },
 
         setKeyKnight (name) {
-            System.saveConfiguration('keyNightName', name);
+            System.saveConfiguration('keyKnightName', name);
         },
 
         getKeyKnight () {
-            return System.readConfiguration('keyNightName');
+            debugging('keyKnightName', System.readConfiguration('keyKnightName'));
+
+            return System.readConfiguration('keyKnightName');
         },
 
         async capture (name) {
@@ -5090,7 +5091,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.please(KnightManager._keyKnightName);
+                await KnightManager.please(System.readConfiguration('keyKnightName'));
             }
         }, {
             label: '.',
@@ -5217,7 +5218,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.giveGold(KnightManager._keyKnightName, '赠送金锭');
+                await KnightManager.giveGold(System.readConfiguration('keyKnightName'), '赠送金锭');
             }
         }, {
             label: '$15',
@@ -5230,7 +5231,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.giveGold(KnightManager._keyKnightName, '赠送15金锭');
+                await KnightManager.giveGold(System.readConfiguration('keyKnightName'), '赠送15金锭');
             }
         }, {
             label: '随机走杀',
