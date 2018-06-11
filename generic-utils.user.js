@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.18
-// @description  just to make the game eaiser!
+// @version      2.1.19
+// @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
 // @run-at       document-idle
@@ -1210,8 +1210,6 @@ window.setTimeout(function () {
         },
 
         getKeyKnight () {
-            debugging('keyKnightName', System.readConfiguration('keyKnightName'));
-
             return System.readConfiguration('keyKnightName');
         },
 
@@ -2909,7 +2907,8 @@ window.setTimeout(function () {
             MessageMonitor.enable();
 
             async function fire (dragon, action) {
-                ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
+                if (Objects.Room.getName() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
+
                 let npcs = await DragonHelper.locateRoomInformation(dragon);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
 
@@ -2933,9 +2932,13 @@ window.setTimeout(function () {
 
             let start = new Date().getTime();
             while (!npcs.length) {
-                debugging('房间信息未刷新，等待并重新刷新检测 - ', Objects.Room.getName);
+                debugging('npc 信息未刷新，等待并重新刷新检测 - ', null, Objects.Room.getName);
                 await ExecutionManager.wait(20);
+
+                debugging('准备开始再次刷新房间信息...');
                 npcs = Objects.Room.getAvailableNpcsV2(target, true);
+                debugging('在场符合条件的 npc:', npcs);
+
                 debugging('在场玩家：', null, DragonHelper.getUserList);
 
                 if (new Date().getTime() - start > 20000) break;
@@ -3028,9 +3031,7 @@ window.setTimeout(function () {
         }
 
         handle () {
-            if (this._message.get('type') === 'attrs_changed') return;
-
-            debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
+            // debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
 
             switch (this._message.get('type')) {
                 case 'main_msg':
@@ -3862,7 +3863,7 @@ window.setTimeout(function () {
             ButtonManager.click('auto_tasks cancel');
         },
 
-        async fire () {
+        async fire (mapName) {
             PuzzleHelper.reset();
 
             await Navigation.travelsalWithEvent('碧海山庄', breakEvent);
@@ -3878,16 +3879,16 @@ window.setTimeout(function () {
                     if (isValidTask(lastMessage, targets[i])) PuzzleHelper._workqueue.push(lastMessage);
 
                     await ExecutionManager.wait(200);
-                    if (!hasQuanlifiedTask()) {
+                    if (!hasQuanlifiedTask(mapName)) {
                         PuzzleHelper.reset();
                     }
                 }
 
                 return PuzzleHelper._workqueue.length === 5;
 
-                function hasQuanlifiedTask () {
+                function hasQuanlifiedTask (mapName) {
                     debugging(`${PuzzleHelper._workqueue.length}/${PuzzleHelper._workqueue}`);
-                    return PuzzleHelper._workqueue.length && PuzzleHelper._workqueue.some(t => t.match('天山|苗疆'));
+                    return PuzzleHelper._workqueue.length && PuzzleHelper._workqueue.some(t => t.match(mapName));
                 }
 
                 function isValidTask (message, npc) {
@@ -4620,11 +4621,20 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '苗疆谜题',
-            title: '自动对话碧海 npc 看有没有天山苗疆谜题...',
+            title: '自动对话碧海 npc 看有没有苗疆谜题...',
 
             eventOnClick () {
                 if (window.confirm('确定去碧海接谜题？\n\n注意：当前谜题可能会被清空。')) {
-                    PuzzleHelper.fire();
+                    PuzzleHelper.fire('苗疆');
+                }
+            }
+        }, {
+            label: '天山谜题',
+            title: '自动对话碧海 npc 看有没有天山谜题...',
+
+            eventOnClick () {
+                if (window.confirm('确定去碧海接谜题？\n\n注意：当前谜题可能会被清空。')) {
+                    PuzzleHelper.fire('天山');
                 }
             }
         }]
