@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.21
+// @version      2.1.22
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -2809,15 +2809,15 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            let key = System.isLocalServer() ? 'dragonMonitorRegKeywords4ExcludedTargets' : 'dragonMonitorRegKeywords4ExcludedTargets.remote';
+            let key = System.isLocalServer() ? 'dragon.reg.excluded' : 'dragon.reg.excluded.remote';
 
-            return System.readConfiguration(key) || (User.getId() === 'u4234800' ? ['天寒', '残雪', '明月'] : ['轩辕剑碎片', '破岳']);
+            return System.readConfiguration(key);
         },
 
-        setRegKeywords4ExcludedTargets (regKeywords4ExcludedTargets) {
-            let key = System.isLocalServer() ? 'dragonMonitorRegKeywords4ExcludedTargets' : 'dragonMonitorRegKeywords4ExcludedTargets.remote';
+        setRegKeywords4ExcludedTargets (regKeywords) {
+            let key = System.isLocalServer() ? 'dragon.reg.excluded' : 'dragon.reg.excluded.remote';
 
-            System.saveConfiguration(key, regKeywords4ExcludedTargets);
+            System.saveConfiguration(key, regKeywords);
         },
 
         getKillBadPeople () {
@@ -2829,13 +2829,13 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            let key = System.isLocalServer() ? 'dragonMonitorRegKeyWords' : 'dragonMonitorRegKeyWords.remote';
+            let key = System.isLocalServer() ? 'dragon.reg.match' : 'dragon.reg.match.remote';
 
-            return System.readConfiguration(key) || (User.getId() === 'u4234800' ? ['轩辕剑|破岳|鱼肠', '小李飞刀'] : ['碎片', '斩龙宝镯']);
+            return System.readConfiguration(key);
         },
 
         setRegKeywords (regKeywords) {
-            let key = System.isLocalServer() ? 'dragonMonitorRegKeyWords' : 'dragonMonitorRegKeyWords.remote';
+            let key = System.isLocalServer() ? 'dragon.reg.match' : 'dragon.reg.match.remote';
 
             System.saveConfiguration(key, regKeywords);
         },
@@ -2916,9 +2916,14 @@ window.setTimeout(function () {
         async handle () {
             MessageMonitor.disable();
 
-            if (System.readConfiguration('dragonMonitorRegKeywords4ExcludedTargets').some(v => this._dragon.getBonus().match(v))) {
+            let regMatch = DragonMonitor.getRegKeywords();
+            let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
+            debugging('regMatch: ', regMatch);
+            debugging('regExcluded: ', regExcluded);
+
+            if (regExcluded && this._dragon.getBonus().match(regExcluded)) {
                 log('指定过滤掉不抢的目标：' + this._dragon.getBonus());
-            } else if (System.readConfiguration('dragonMonitorRegKeyWords').some(v => this._dragon.getBonus().match(v))) {
+            } else if (regMatch && this._dragon.getBonus().match(regMatch)) {
                 log('发现需要的目标：' + this._dragon.getBonus());
 
                 await fire(this._dragon, DragonHelper.killDirectly);
@@ -2947,11 +2952,11 @@ window.setTimeout(function () {
     };
 
     var DragonHelper = {
-        identifyDragonEvent (message) {
-            let msg = System.replaceControlCharBlank(message.get('msg'));
-            debugging('去掉颜色字符: ' + msg);
+        identifyDragonEvent (msg) {
+            let event = System.replaceControlCharBlank(msg);
+            debugging('过滤颜色字符: ' + event);
 
-            return msg.match(DragonMonitor._REG_DRAGON_APPERS);
+            return event.match(DragonMonitor._REG_DRAGON_APPERS);
         },
 
         async locateRoomInformation (dragon) {
@@ -3025,7 +3030,7 @@ window.setTimeout(function () {
         },
 
         observerMode (dragon) {
-            return System.readConfiguration('dragonMonitorRegKeyWords').some(v => dragon.getBonus().match(v.replace(/"/g, '')));
+            return DragonMonitor.getRegKeywords().split('|').some(v => dragon.getBonus().match(v.replace(/"/g, '')));
         },
 
         async observe (npc) {
@@ -3090,13 +3095,10 @@ window.setTimeout(function () {
                     debugging('msg: ', msg);
 
                     if (msg.includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
-                        debugging('本服青龙: ' + System.isLocalServer());
-                        debugging('所在区: ' + User.getArea());
-                        debugging('所在大区: ' + User.getAreaRange());
                         if (!System.isLocalServer() && !msg.includes(User.getAreaRange())) return;
 
                         debugging('解析青龙信息。。。');
-                        let dragonEvent = DragonHelper.identifyDragonEvent(this._message);
+                        let dragonEvent = DragonHelper.identifyDragonEvent(msg);
                         if (dragonEvent) {
                             let dragon = DragonHelper.parseDragonInfo(dragonEvent);
                             debugging('青龙信息解析成功:', dragon);
@@ -3363,6 +3365,7 @@ window.setTimeout(function () {
                 _BODY: {
                     '雪亭镇-木屋-花不为': 'jh 1;e;#4 n;e',
                     '雪亭镇-雪亭镇街道-农夫': 'jh 1;e;s;w',
+                    '雪亭镇-淳风武馆教练场-武馆弟子': 'jh 1;e;n;e;e',
                     '洛阳-*银钩赌坊*-雅舍-玉娘': 'jh 2;#5 n;w;w;#3 n;e',
                     '洛阳-桃花别院-红娘': 'jh 2;#4 n;w;s',
                     '洛阳-*白冢*-观景台-护卫': 'jh 2;#5 n;e;e;n;n;w',
@@ -4275,7 +4278,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '好',
-            title: '实时监控面板，有特定青龙出现抢杀好人...\n\n当前设定监控关键字为：' + DragonMonitor.getRegKeywords(),
+            title: '实时监控面板，有特定青龙出现抢杀好人...',
             id: 'id-dragon-monitor-kill-good',
             width: '38px',
             marginRight: '1px',
@@ -4292,7 +4295,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '坏',
-            title: '实时监控面板，有特定青龙出现抢杀坏人...\n\n当前设定监控关键字为：' + DragonMonitor.getRegKeywords(),
+            title: '实时监控面板，有特定青龙出现抢杀坏人...',
             id: 'id-dragon-monitor-kill-bad',
             width: '38px',
 
@@ -4308,35 +4311,27 @@ window.setTimeout(function () {
             }
         }, {
             label: '设',
-            title: '设置青龙目标...当前设定为：\n\n' + DragonMonitor.getRegKeywords(),
+            title: '设置青龙目标...',
             id: 'id-dragon-monitor-setting',
             width: '38px',
             marginRight: '1px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式确认要监控什么青龙装备。\n\n格式说明：\n1. 可用斜线隔开多种不同关键字：轩辕剑碎片/斩龙宝戒\n2. 只需关键字，不需全名：镯/碎片/戒\n3. 每个关键字都支持正则表达式语法', DragonMonitor.getRegKeywords().join('/'));
+                let answer = window.prompt('请按格式确认要监控什么青龙装备。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：轩辕剑碎片|斩龙宝戒\n2. 只需关键字，不需全名：镯|碎片|戒\n3. 支持正则表达式语法', DragonMonitor.getRegKeywords());
                 if (!answer) return;
 
-                DragonMonitor.setRegKeywords(answer.split('/'));
-
-                $(this).attr('title', '当前设定监控青龙装备关键字为：\n\n' + DragonMonitor.getRegKeywords());
+                DragonMonitor.setRegKeywords(answer);
             }
         }, {
             label: '滤',
-            title: '设置不打的青龙目标...当前设定为：\n\n' + DragonMonitor.getRegKeywords4ExcludedTargets(),
+            title: '设置不打的青龙目标...',
             width: '38px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式 (比如 轩辕剑碎片/镯/斩龙宝戒) 填入不打的青龙关键字。', DragonMonitor.getRegKeywords4ExcludedTargets().join('/'));
-                if (!answer) {
-                    DragonMonitor.setRegKeywords4ExcludedTargets([]);
-                    $(this).attr('title', '当前没有设定不打的青龙');
-
-                    return;
+                let answer = window.prompt('请按格式 (比如 轩辕剑碎片|镯|斩龙宝戒) 填入不打的青龙关键字。', DragonMonitor.getRegKeywords4ExcludedTargets());
+                if (answer || answer === '') {
+                    DragonMonitor.setRegKeywords4ExcludedTargets(answer);
                 }
-
-                DragonMonitor.setRegKeywords4ExcludedTargets(answer.split('/'));
-                $(this).attr('title', '设置不打的青龙目标...当前设定为：\n\n' + DragonMonitor.getRegKeywords4ExcludedTargets());
             }
         }, {
         }, {
