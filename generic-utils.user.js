@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.19
+// @version      2.1.20
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -76,7 +76,7 @@ window.setTimeout(function () {
         },
 
         isLocalServer () {
-            return User.getArea() > 1000;
+            return User.getArea() < 1000;
         }
     };
 
@@ -2342,6 +2342,10 @@ window.setTimeout(function () {
 
     var Objects = {
         Room: {
+            refresh () {
+                ExecutionManager.execute('clickButton("golook_room", 0)');
+            },
+
             filterTargetObjectsByKeyword (regKeyword) {
                 return $('.cmd_click3').filter(function () { return $(this).text().match(regKeyword); });
             },
@@ -2358,6 +2362,10 @@ window.setTimeout(function () {
                 return Objects.Room.getTargetDomByName(name).length > 0;
             },
 
+            getNameV2 () {
+                return $('span.out').find('span.outtitle').text();
+            },
+
             getName () {
                 if (System.globalObjectMap.get('msg_room')) return System.globalObjectMap.get('msg_room').get('short');
 
@@ -2368,10 +2376,11 @@ window.setTimeout(function () {
                 return System.globalObjectMap.get('msg_room').get('type');
             },
 
-            getAvailableNpcs (name = '') {
+            getAvailableNpcs (name = '', regMatch = false) {
                 let npcs = [];
                 Objects.Room.getTargetDomByName().each(function () {
-                    if (name && name !== $(this).text()) return;
+                    if (name && !regMatch && name !== $(this).text()) return;
+                    if (name && regMatch && !name.includes($(this).text())) return;
 
                     let matches = $(this).attr('onclick').match('look_npc (.*?)\'');
                     if (matches) {
@@ -2779,7 +2788,7 @@ window.setTimeout(function () {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
         },
 
-        _REG_DRAGON_APPERS: `^青龙会组织：((\\[${User.getAreaRange().replace('-', '\\-')}\\])?.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
+        _REG_DRAGON_APPERS: `^青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
         isActive () {
             return DragonMonitor._active;
@@ -2793,6 +2802,10 @@ window.setTimeout(function () {
         stop () {
             DragonMonitor._active = false;
             log('Dragon Monitor stopped.');
+        },
+
+        getGood (roomName) {
+            return DragonMonitor._goodTargets[roomName];
         },
 
         getRegKeywords4ExcludedTargets () {
@@ -2825,6 +2838,11 @@ window.setTimeout(function () {
             let key = System.isLocalServer() ? 'dragonMonitorRegKeyWords' : 'dragonMonitorRegKeyWords.remote';
 
             System.saveConfiguration(key, regKeywords);
+        },
+
+        resetMonitoringSettings () {
+            ButtonManager.resetButtonById('id-dragon-monitor-kill-good');
+            ButtonManager.resetButtonById('id-dragon-monitor-kill-bad');
         }
     };
 
@@ -2843,6 +2861,14 @@ window.setTimeout(function () {
 
         getEvil () {
             return this._evil;
+        }
+
+        setGood (good) {
+            this._good = good;
+        }
+
+        getGood () {
+            return this._good;
         }
 
         setRoom (room) {
@@ -2907,12 +2933,12 @@ window.setTimeout(function () {
             MessageMonitor.enable();
 
             async function fire (dragon, action) {
-                if (Objects.Room.getName() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
+                if (Objects.Room.getNameV2() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
 
                 let npcs = await DragonHelper.locateRoomInformation(dragon);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
 
-                await action(npc);
+                if (npc) await action(npc);
 
                 debugging('战斗前在场 npc：' + npcs.map(v => v.getName()).join(','));
                 await Navigation.move('escape;prev;home');
@@ -2922,23 +2948,30 @@ window.setTimeout(function () {
 
     var DragonHelper = {
         identifyDragonEvent (message) {
-            return System.replaceControlCharBlank(message.get('msg')).match(DragonMonitor._REG_DRAGON_APPERS);
+            let msg = System.replaceControlCharBlank(message.get('msg'));
+            debugging('去掉颜色字符: ' + msg);
+
+            return msg.match(DragonMonitor._REG_DRAGON_APPERS);
         },
 
         async locateRoomInformation (dragon) {
-            let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : DragonMonitor._goodTargets[dragon.getRoom()];
+            await ExecutionManager.wait(100);
+
+            let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : dragon.getGood();
+            debugging('目标关键字：' + target);
+            debugging('在场 npc: ', null, Objects.Room.getAvailableNpcs);
             let npcs = Objects.Room.getAvailableNpcsV2(target, true);
             debugging('在场玩家：', null, DragonHelper.getUserList);
+            debugging('在场符合条件的 npc:', npcs);
 
             let start = new Date().getTime();
             while (!npcs.length) {
-                debugging('npc 信息未刷新，等待并重新刷新检测 - ', null, Objects.Room.getName);
-                await ExecutionManager.wait(20);
+                debugging('npc 信息未刷新，等待');
+                await ExecutionManager.wait(100);
 
-                debugging('准备开始再次刷新房间信息...');
+                debugging('等待结束，重新刷新检测 - ', null, Objects.Room.getName);
                 npcs = Objects.Room.getAvailableNpcsV2(target, true);
                 debugging('在场符合条件的 npc:', npcs);
-
                 debugging('在场玩家：', null, DragonHelper.getUserList);
 
                 if (new Date().getTime() - start > 20000) break;
@@ -2974,15 +3007,19 @@ window.setTimeout(function () {
         },
 
         parseDragonInfo (matches) {
+            debugging('青龙原始信息匹配：', matches);
+
             let dragon = new Dragon();
             dragon.setAvailability(true);
             dragon.setEvil(matches[1]);
-            dragon.setBonus(matches[4]);
-            dragon.setCounter(parseInt(matches[6]));
+            dragon.setBonus(matches[3]);
+            dragon.setCounter(parseInt(matches[5]));
 
-            let placeInfo = matches[3].split(';')[2].split('');
+            let placeInfo = matches[2].split(';')[2].split('');
             dragon.setRoom(placeInfo[1]);
             dragon.setLink(placeInfo[0]);
+
+            dragon.setGood(System.isLocalServer() ? DragonMonitor.getGood(dragon.getRoom()) : '[' + User.getAreaRange + '区]' + DragonMonitor.getGood(dragon.getRoom()));
 
             return dragon;
         },
@@ -3022,6 +3059,20 @@ window.setTimeout(function () {
 
         isEnabled () {
             return DragonMonitor.isActive() || TeamworkHelper.isInLeadMode();
+        },
+
+        isNoise (message) {
+            if (!System.readConfiguration('debugging.messageFilter')) return false;
+
+            let filters = System.readConfiguration('debugging.messageFilter').split(',');
+            return filters.some(function (v) {
+                if (!v.includes('|')) {
+                    return message.get('type') === v;
+                } else {
+                    let keywords = v.split('|');
+                    return message.get('type') === keywords[0] && message.get('subtype') === keywords[1];
+                }
+            });
         }
     };
 
@@ -3031,18 +3082,24 @@ window.setTimeout(function () {
         }
 
         handle () {
-            // debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
+            debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
 
             switch (this._message.get('type')) {
                 case 'main_msg':
                     let msg = this._message.get('msg');
-                    if (msg.includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
-                        if (msg.includes('[') && !msg.includes(User.getAreaRange())) return;
+                    debugging('msg: ', msg);
 
+                    if (msg.includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
+                        debugging('本服青龙: ' + System.isLocalServer());
+                        debugging('所在区: ' + User.getArea());
+                        debugging('所在大区: ' + User.getAreaRange());
+                        if (!System.isLocalServer() && !msg.includes(User.getAreaRange())) return;
+
+                        debugging('解析青龙信息。。。');
                         let dragonEvent = DragonHelper.identifyDragonEvent(this._message);
                         if (dragonEvent) {
                             let dragon = DragonHelper.parseDragonInfo(dragonEvent);
-                            debugging('dragon info identified:', dragon);
+                            debugging('青龙信息解析成功:', dragon);
 
                             new DragonMessageHandler(dragon).handle();
                         }
@@ -3086,6 +3143,11 @@ window.setTimeout(function () {
 
         async wait (timeout) {
             return new Promise((resolve, reject) => { setTimeout(function () { resolve(); }, timeout); });
+        },
+
+        delay (timeout) {
+            let start = new Date().getTime();
+            while (new Date().getTime() - start < timeout) { };
         }
     };
 
@@ -4278,12 +4340,28 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '调试模式',
+            label: '调试',
             title: '当调试模式开启，浏览器控制台会输出更详细的日志，方便追踪问题。',
             id: 'id-debugging',
+            width: '60px',
+            marginRight: '1px',
 
             eventOnClick () {
                 System.debugMode = ButtonManager.simpleToggleButtonEvent(this);
+            }
+        }, {
+            label: '.',
+            title: '设置消息过滤，目前只支持 type|subtype 级别。当前设定为 ' + System.readConfiguration('debugging.messageFilter'),
+            width: '10px',
+            id: 'id-debugging-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.readConfiguration('debugging.messageFilter'));
+                if (answer) {
+                    System.saveConfiguration('debugging.messageFilter', answer);
+                } else if (answer === '') {
+                    System.saveConfiguration('debugging.messageFilter', '');
+                }
             }
         }, {
         }, {
@@ -4485,6 +4563,8 @@ window.setTimeout(function () {
                 } else {
                     await Navigation.move('home;home;home;home');
                     document.title = User.getNickName();
+
+                    DragonMonitor.resetMonitoringSettings();
                 }
             }
         }, {
@@ -6142,7 +6222,7 @@ window.setTimeout(function () {
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
         this.originalDispatchMessage(message);
 
-        if (MessageMonitor.isEnabled()) {
+        if (MessageMonitor.isEnabled() && !MessageMonitor.isNoise(message)) {
             new MessageHandler(message).handle();
         }
     };
