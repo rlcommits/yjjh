@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.20
+// @version      2.1.21
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -3019,7 +3019,7 @@ window.setTimeout(function () {
             dragon.setRoom(placeInfo[1]);
             dragon.setLink(placeInfo[0]);
 
-            dragon.setGood(System.isLocalServer() ? DragonMonitor.getGood(dragon.getRoom()) : '[' + User.getAreaRange + '区]' + DragonMonitor.getGood(dragon.getRoom()));
+            dragon.setGood(System.isLocalServer() ? DragonMonitor.getGood(dragon.getRoom()) : '[' + User.getAreaRange() + '区]' + DragonMonitor.getGood(dragon.getRoom()));
 
             return dragon;
         },
