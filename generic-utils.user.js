@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.24
+// @version      2.1.25
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -63,13 +63,13 @@ window.setTimeout(function () {
             if (!System._uid) System._uid = User.getId();
         },
 
-        saveConfiguration (key, value) {
+        setVariant (key, value) {
             System._initializeUid();
 
             window.GM_setValue(`${System._uid}.${key}`, value);
         },
 
-        readConfiguration (key) {
+        getVariant (key) {
             System._initializeUid();
 
             return window.GM_getValue(`${System._uid}.${key}`);
@@ -77,6 +77,20 @@ window.setTimeout(function () {
 
         isLocalServer () {
             return User.getArea() < 1000;
+        },
+
+        keys: {
+            ATTACK_SKILLS: 'attack.skills',
+            ATTACK_SKILLS_BUFFER_RESERVED: 'attack.skills.buffer.reserved',
+            TEAMWORK_LEAD_NAME: 'teamwork.lead.name',
+            TEAMWORK_LEAD_ID: 'teamwork.lead.id',
+            KEY_KNIGHT_NAME: 'knight.name',
+            DRAGON_REG_MATCH: 'dragon.reg.match',
+            DRAGON_REG_MATCH_REMOTE: 'dragon.reg.match.remote',
+            DRAGON_REG_EXCLUDED: 'dragon.reg.excluded',
+            DRAGON_REG_EXCLUDED_REMOTE: 'dragon.reg.excluded.remote',
+            RECOVERY_SKILL: 'recovery.skill',
+            RECOVERY_THRESHOLD: 'recovery.threshold'
         }
     };
 
@@ -90,6 +104,19 @@ window.setTimeout(function () {
 
             await analyseEnforce();
             await Objects.Room.refresh();
+
+            document.title = User.getNickName();
+
+            logCurrentSettings();
+
+            function logCurrentSettings () {
+                log(`自动出招设置：${System.getVariant(System.keys.ATTACK_SKILLS)} - 预留 ${System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)} 气`);
+                log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
+                log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
+                log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
+                log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
+                log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
+            }
 
             async function analyseEnforce () {
                 if (parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'))) {
@@ -991,7 +1018,7 @@ window.setTimeout(function () {
             '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
             '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
             '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲',
-            '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙',
+            '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
             '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
             '莲蓬',
             '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
@@ -1201,19 +1228,19 @@ window.setTimeout(function () {
             if (targetUser.length) {
                 let userInfo = targetUser[0]['value'].split(',');
 
-                System.saveConfiguration('teamLeadName', userInfo[1]);
-                System.saveConfiguration('teamLeadId', userInfo[0]);
+                System.setVariant(System.keys.TEAMWORK_LEAD_NAME, userInfo[1]);
+                System.setVariant(System.keys.TEAMWORK_LEAD_ID, userInfo[0]);
 
                 return true;
             }
         },
 
         getTeamLeadName () {
-            return System.readConfiguration('teamLeadName');
+            return System.getVariant(System.keys.TEAMWORK_LEAD_NAME);
         },
 
         getTeamLeadId () {
-            return System.readConfiguration('teamLeadId');
+            return System.getVariant(System.keys.TEAMWORK_LEAD_ID);
         },
 
         async move (direction) {
@@ -1262,14 +1289,14 @@ window.setTimeout(function () {
         _REG_SECRET_TREASURE: '.*?对你悄声道：你现在去(.*?)，.*?',
 
         async detectUserSettings () {
-            System.saveConfiguration('keyKnightName', await detectKeyKnight());
+            System.setVariant(System.keys.KEY_KNIGHT_NAME, await detectKeyKnight());
 
             await detectSkills();
             await detectKeyKnight();
 
             async function detectSkills () {
                 let skillView = $('.outtitle').text() === '我的技能';
-                await ButtonManager.click('skills');
+                await ButtonManager.click(System.keys.ATTACK_SKILLS);
                 if (!skillView) await ButtonManager.click('prev');
             }
 
@@ -1281,11 +1308,11 @@ window.setTimeout(function () {
         },
 
         setKeyKnight (name) {
-            System.saveConfiguration('keyKnightName', name);
+            System.setVariant(System.keys.KEY_KNIGHT_NAME, name);
         },
 
         getKeyKnight () {
-            return System.readConfiguration('keyKnightName');
+            return System.getVariant(System.keys.KEY_KNIGHT_NAME);
         },
 
         async capture (name) {
@@ -1876,30 +1903,7 @@ window.setTimeout(function () {
 
             return result;
         }
-    }
-
-    class CombatSetting {
-        constructor (skills, bufferReserved = 2) {
-            this._skills = skills;
-            this._bufferReserved = bufferReserved;
-        }
-
-        getSkills () {
-            return this._skills;
-        }
-
-        setSkills (skills) {
-            this._skills = skills;
-        }
-
-        getBufferReserved () {
-            return this._bufferReserved;
-        }
-
-        getSkillsAbbr () {
-            return this._skills.map(v => v.substr(0, 2)).join('');
-        }
-    }
+    };
 
     var MiaojiangHelper = {
         async goOutMaze (maze) {
@@ -1935,33 +1939,41 @@ window.setTimeout(function () {
     };
 
     var RecoveryHelper = {
-        _skill: '道种心魔经',
-        _threshold: '0.7',
         _retry: new Retry(500),
         _stopContinualRecovery: false,
 
         setSkill (skill) {
-            RecoveryHelper._skill = skill;
+            if (!skill) skill = '道种心魔经';
+
+            System.setVariant(System.keys.RECOVERY_SKILL, skill);
         },
 
         getSkill () {
-            return RecoveryHelper._skill;
+            if (!System.getVariant(System.keys.RECOVERY_SKILL)) {
+                System.setVariant(System.keys.RECOVERY_SKILL, '道种心魔经');
+            }
+
+            return System.getVariant(System.keys.RECOVERY_SKILL);
         },
 
         getThreshold () {
-            return RecoveryHelper._threshold;
+            if (!System.getVariant(System.keys.RECOVERY_THRESHOLD)) {
+                System.setVariant(System.keys.RECOVERY_THRESHOLD, 0.7);
+            }
+
+            return System.getVariant(System.keys.RECOVERY_THRESHOLD);
         },
 
         setThreshold (threshold) {
-            RecoveryHelper._threshold = threshold;
+            System.setVariant(System.keys.RECOVERY_THRESHOLD, threshold);
         },
 
         recoverBySkill () {
             let currentKee = System.globalObjectMap.get('msg_attrs').get('kee');
             let maxKee = System.globalObjectMap.get('msg_attrs').get('max_kee');
-            if ((currentKee / maxKee) < RecoveryHelper._threshold) {
+            if ((currentKee / maxKee) < RecoveryHelper.getThreshold()) {
                 debugging('current kee/max kee=' + currentKee + '/' + maxKee);
-                PerformHelper.perform(RecoveryHelper._skill);
+                PerformHelper.perform(RecoveryHelper.getSkill());
             }
         },
 
@@ -2071,10 +2083,34 @@ window.setTimeout(function () {
     };
 
     var PerformHelper = {
-        _combatSetting: new CombatSetting(['如来神掌', '覆雨剑法'], 2),
+        Skillset: {
+            getSkills () {
+                if (!System.getVariant(System.keys.ATTACK_SKILLS)) {
+                    System.setVariant(System.keys.ATTACK_SKILLS, ['如来神掌', '覆雨剑法']);
+                }
 
-        getCombatSetting () {
-            return PerformHelper._combatSetting;
+                return System.getVariant(System.keys.ATTACK_SKILLS);
+            },
+
+            setSkills (skills = []) {
+                System.setVariant(System.keys.ATTACK_SKILLS, skills);
+            },
+
+            getSkillsAbbr () {
+                return PerformHelper.Skillset.getSkills().map(v => v.substr(0, 2)).join('');
+            }
+        },
+
+        getBufferReserved () {
+            if (!System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)) {
+                System.setVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED, 0);
+            }
+
+            return parseInt(System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED));
+        },
+
+        setBufferReserved (bufferReserved) {
+            System.setVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED, bufferReserved);
         },
 
         readyToPerform (threshold) {
@@ -2095,10 +2131,10 @@ window.setTimeout(function () {
         },
 
         fire () {
-            let availableSkills = Panels.Combat.getAvailableSkills(PerformHelper._combatSetting.getSkills());
+            let availableSkills = Panels.Combat.getAvailableSkills(PerformHelper.Skillset.getSkills());
             if (!availableSkills.length) return;
 
-            let bufferRequired = new BufferCalculator(availableSkills).getBufferRequired() + PerformHelper._combatSetting.getBufferReserved();
+            let bufferRequired = new BufferCalculator(availableSkills).getBufferRequired() + PerformHelper.getBufferReserved();
             if (PerformHelper.readyToPerform(bufferRequired)) {
                 PerformHelper.perform(availableSkills);
             }
@@ -2885,15 +2921,15 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            let key = System.isLocalServer() ? 'dragon.reg.excluded' : 'dragon.reg.excluded.remote';
+            let key = System.isLocalServer() ? System.keys.DRAGON_REG_EXCLUDED : System.keys.DRAGON_REG_EXCLUDED_REMOTE;
 
-            return System.readConfiguration(key);
+            return System.getVariant(key);
         },
 
         setRegKeywords4ExcludedTargets (regKeywords) {
-            let key = System.isLocalServer() ? 'dragon.reg.excluded' : 'dragon.reg.excluded.remote';
+            let key = System.isLocalServer() ? System.keys.DRAGON_REG_EXCLUDED : System.keys.DRAGON_REG_EXCLUDED_REMOTE;
 
-            System.saveConfiguration(key, regKeywords);
+            System.setVariant(key, regKeywords);
         },
 
         getKillBadPeople () {
@@ -2905,15 +2941,15 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            let key = System.isLocalServer() ? 'dragon.reg.match' : 'dragon.reg.match.remote';
+            let key = System.isLocalServer() ? System.keys.DRAGON_REG_MATCH : System.keys.DRAGON_REG_MATCH_REMOTE;
 
-            return System.readConfiguration(key);
+            return System.getVariant(key);
         },
 
         setRegKeywords (regKeywords) {
-            let key = System.isLocalServer() ? 'dragon.reg.match' : 'dragon.reg.match.remote';
+            let key = System.isLocalServer() ? System.keys.DRAGON_REG_MATCH : System.keys.DRAGON_REG_MATCH_REMOTE;
 
-            System.saveConfiguration(key, regKeywords);
+            System.setVariant(key, regKeywords);
         },
 
         resetMonitoringSettings () {
@@ -3175,9 +3211,9 @@ window.setTimeout(function () {
         },
 
         isMessageInLoggingRejectedList (messagePack) {
-            if (!System.readConfiguration('debugging.messageFilter')) return false;
+            if (!System.getVariant('debugging.messageFilter')) return false;
 
-            let filters = System.readConfiguration('debugging.messageFilter').split(',');
+            let filters = System.getVariant('debugging.messageFilter').split(',');
             return filters.some(function (v) {
                 if (!v.includes('|')) {
                     return messagePack.get('type') === v;
@@ -4341,16 +4377,16 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.readConfiguration('debugging.messageFilter'),
+            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.getVariant('debugging.messageFilter'),
             width: '10px',
             id: 'id-debugging-setting',
 
             async eventOnClick () {
-                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.readConfiguration('debugging.messageFilter'));
+                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.getVariant('debugging.messageFilter'));
                 if (answer) {
-                    System.saveConfiguration('debugging.messageFilter', answer);
+                    System.setVariant('debugging.messageFilter', answer);
                 } else if (answer === '') {
-                    System.saveConfiguration('debugging.messageFilter', '');
+                    System.setVariant('debugging.messageFilter', '');
                 }
             }
         }, {
@@ -5171,7 +5207,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.please(System.readConfiguration('keyKnightName'));
+                await KnightManager.please(System.getVariant(System.keys.KEY_KNIGHT_NAME));
             }
         }, {
             label: '.',
@@ -5298,7 +5334,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.giveGold(System.readConfiguration('keyKnightName'), '赠送金锭');
+                await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送金锭');
             }
         }, {
             label: '$15',
@@ -5311,7 +5347,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.giveGold(System.readConfiguration('keyKnightName'), '赠送15金锭');
+                await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送15金锭');
             }
         }, {
             label: '随机走杀',
@@ -5430,14 +5466,14 @@ window.setTimeout(function () {
         offset: 3,
 
         buttons: [{
-            label: PerformHelper.getCombatSetting().getSkillsAbbr(),
+            label: PerformHelper.Skillset.getSkillsAbbr(),
             id: 'id-auto-perform',
             width: '64px',
             marginRight: '1px',
-            title: '自动攒气出招, 预留 2 气\n\n注意：\n1. 必刷技能设置多于四个时可能连招失败\n2. 只匹配到一个招数名字时，按单招触发\n3. 暂时不支持设置预留气的数目',
+            title: '自动攒气出招, 预留 ' + PerformHelper.getBufferReserved() + ' 气\n\n注意：\n1. 必刷技能设置多于四个时可能连招失败\n2. 只匹配到一个招数名字时，按单招触发',
 
             async eventOnClick () {
-                let defaultText = PerformHelper.getCombatSetting().getSkillsAbbr();
+                let defaultText = PerformHelper.Skillset.getSkillsAbbr();
                 let defaultLabel = new ButtonLabel(defaultText);
                 let toggleLabel = new ButtonLabel('x ' + defaultText, '', 'red');
 
@@ -5445,6 +5481,8 @@ window.setTimeout(function () {
                     if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').start();
 
                     CombatHelper.enableAutoPerforming();
+
+                    $(this).text($(this).text().substr(0, 5));
                 } else {
                     CombatHelper.disableAutoPerforming();
 
@@ -5458,14 +5496,23 @@ window.setTimeout(function () {
             id: 'id-auto-perform-setting',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式确认绝学阵所需技能名字，例如：九天龙吟剑法+排云掌法', PerformHelper.getCombatSetting().getSkills().join('+'));
+                let answer = window.prompt('请按格式确认要出的招数和预留的气数，例如：九天龙吟剑法+排云掌法,2 表示 8 气的时候连出九天排云。', PerformHelper.Skillset.getSkills().join('+') + ',' + PerformHelper.getBufferReserved());
                 if (!answer) return;
-                PerformHelper.getCombatSetting().setSkills(answer.split('+'));
 
-                let text = PerformHelper.getCombatSetting().getSkillsAbbr();
-                if ($('#id-auto-perform').text().includes('x')) text = 'x ' + text;
+                let matches = answer.match('(.*?),(.*)');
+                if (!matches) {
+                    window.alert('设置格式不正确，请按提示重新设置。');
+                    return;
+                }
+
+                PerformHelper.Skillset.setSkills(matches[1].split('+'));
+                PerformHelper.setBufferReserved(parseInt(matches[2]));
+
+                let text = PerformHelper.Skillset.getSkillsAbbr();
+                if ($('#id-auto-perform').text().includes('x')) text = 'x ' + text.substr(0, 3);
 
                 $('#id-auto-perform').text(text);
+                $('#id-auto-perform').attr('title', '自动攒气出招, 预留 ' + PerformHelper.getBufferReserved() + ' 气\n\n注意：\n1. 必刷技能设置多于四个时可能连招失败\n2. 只匹配到一个招数名字时，按单招触发');
             }
         }, {
             label: RecoveryHelper.getSkill().substr(0, 2) + ' ' + RecoveryHelper.getThreshold(),
@@ -6187,7 +6234,6 @@ window.setTimeout(function () {
     inintializeHelpButtons(helperConfigurations);
 
     User.initialize();
-    document.title = User.getNickName();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (messagePack) {
