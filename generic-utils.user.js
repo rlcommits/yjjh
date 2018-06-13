@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.23
+// @version      2.1.24
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -89,6 +89,7 @@ window.setTimeout(function () {
             User._areaRange = analyseAreaRange(User.getArea());
 
             await analyseEnforce();
+            await Objects.Room.refresh();
 
             async function analyseEnforce () {
                 if (parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'))) {
@@ -600,13 +601,13 @@ window.setTimeout(function () {
         _lastRoom: '',
 
         async initialize () {
-            await ButtonManager.click('golook_room');
+            await Objects.Room.refresh();
 
             IdleChecker._lastRoom = Objects.Room.getName();
         },
 
         async fire () {
-            await ButtonManager.click('golook_room');
+            await Objects.Room.refresh();
             if (Objects.Room.getType() === 'family') return;
 
             let currentRoom = Objects.Room.getName();
@@ -1094,6 +1095,80 @@ window.setTimeout(function () {
         _autoKill: false,
         _leadMode: false,
 
+        isTeamMember (playerName) {
+            return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
+        },
+
+        Combat: {
+            _isFollowingBattleActive: false,
+            _isFollowingEscapeActive: false,
+
+            isFollowingBattleActive () {
+                return TeamworkHelper.Combat._isFollowingBattleActive;
+            },
+
+            startFollowingBattle () {
+                TeamworkHelper.Combat._isFollowingBattleActive = true;
+            },
+
+            stopFollowingBattle () {
+                TeamworkHelper.Combat._isFollowingBattleActive = false;
+            },
+
+            isFollowingEscapeActive () {
+                return TeamworkHelper.Combat._isFollowingEscapeActive;
+            },
+
+            startFollowingEscape () {
+                TeamworkHelper.Combat._isFollowingEscapeActive = true;
+            },
+
+            stopFollowingEscape () {
+                TeamworkHelper.Combat._isFollowingEscapeActive = false;
+            },
+
+            combatEventHappened (message) {
+                return message.match('(.*?)对著(.*?)喝道：.*?今日不是你死就是我活！|(.*?)对著(.*?)说道：.*?，领教.*?高招！');
+            },
+
+            async followBattleAction (messageWithColor) {
+                let message = System.replaceControlCharBlank(messageWithColor);
+                let matches = null;
+                let action = message.includes('不是你死就是我活') ? '杀死' : '比试';
+
+                if (action === '杀死') {
+                    matches = message.match('(.*?)对著(.*?)喝道：.*?今日不是你死就是我活！');
+                } else {
+                    matches = message.match('(.*?)对著(.*?)说道：.*?，领教.*?高招！');
+                }
+
+                if (matches && TeamworkHelper.isTeamMember(matches[1])) {
+                    debugging('发现队员 ' + matches[1] + ' 发起战斗：', matches);
+                    await Objects.Room.refresh();
+                    Objects.Npc.action(new Npc(matches[2]), action);
+                }
+            },
+
+            escapeEventHappened (message) {
+                return message.match('一看势头不对，溜了！');
+            },
+
+            async followEscapeAction (messageWithColor) {
+                if (!CombatStatus.inProgress()) return;
+
+                let message = System.replaceControlCharBlank(messageWithColor);
+                let matches = message.match('(.*?)一看势头不对，溜了！');
+                if (matches && TeamworkHelper.isTeamMember(matches[1])) {
+                    let escape = new Retry(200);
+                    escape.initialize(function () {
+                        ButtonManager.click('escape');
+                    }, CombatStatus.justFinished);
+
+                    await escape.fire();
+                }
+            }
+        },
+
         enableAutoKill () {
             TeamworkHelper._autoKill = true;
         },
@@ -1107,7 +1182,7 @@ window.setTimeout(function () {
         },
 
         isInLeadMode () {
-            return this._leadMode;
+            return TeamworkHelper._leadMode;
         },
 
         async createTeamIfNeeded () {
@@ -1482,7 +1557,7 @@ window.setTimeout(function () {
         async identifyCandidates () {
             debugging('BodySearch::identifyCandidates:body search starts');
 
-            await ButtonManager.click('golook_room');
+            await Objects.Room.refresh();
             this._stop = false;
             this._candidates = Objects.Room.getAvailableItems().filter((v) => v.getId().includes('corpse'));
         }
@@ -1498,7 +1573,7 @@ window.setTimeout(function () {
             if (this._stop || (this._candidates.length === 0 && !CombatStatus.inProgress())) {
                 debugging('search done.');
                 ButtonManager.resetButtonById('id-body-search');
-                await ButtonManager.click('golook_room');
+                await Objects.Room.refresh();
                 return true;
             } else {
                 debugging('BodySearch::fire:candidates size=' + this._candidates.length);
@@ -2345,8 +2420,8 @@ window.setTimeout(function () {
 
     var Objects = {
         Room: {
-            refresh () {
-                ExecutionManager.execute('clickButton("golook_room", 0)');
+            async refresh () {
+                await ButtonManager.click('golook_room');
             },
 
             filterTargetObjectsByKeyword (regKeyword) {
@@ -2754,12 +2829,12 @@ window.setTimeout(function () {
         },
 
         isButtonPressed (buttonId) {
-            let button = $('#' + buttonId);
+            let button = buttonId.includes('#') ? $(buttonId) : $('#' + buttonId);
             return button.text().includes('x');
         },
 
         pressDown (buttonId) {
-            let button = $('#' + buttonId);
+            let button = buttonId.includes('#') ? $(buttonId) : $('#' + buttonId);
             if (button.css('color') === 'rgb(0, 0, 0)') button.click();
         },
 
@@ -2915,7 +2990,7 @@ window.setTimeout(function () {
         }
 
         async handle () {
-            MessageMonitor.disable();
+            MessageListener.disable();
 
             let regMatch = DragonMonitor.getRegKeywords();
             let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
@@ -2936,7 +3011,7 @@ window.setTimeout(function () {
                 log('没有在关注列表里的目标：' + this._dragon.getBonus());
             }
 
-            MessageMonitor.enable();
+            MessageListener.enable();
 
             async function fire (dragon, action) {
                 if (Objects.Room.getNameV2() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
@@ -2953,8 +3028,24 @@ window.setTimeout(function () {
     };
 
     var DragonHelper = {
-        identifyDragonEvent (msg) {
-            let event = System.replaceControlCharBlank(msg);
+        isValidDragonEvent (message) {
+            if (!message.includes('青龙会组织')) return false;
+            if (!areaMatched(message)) return false;
+            if (CombatStatus.inProgress()) return false;
+
+            return true;
+
+            function areaMatched (message) {
+                if (System.isLocalServer()) return true;
+
+                return message.includes(User.getAreaRange());
+            }
+        },
+
+        identifyDragonEvent (message) {
+            debugging('解析青龙信息。。。');
+
+            let event = System.replaceControlCharBlank(message);
             debugging('过滤颜色字符: ' + event);
 
             return event.match(DragonMonitor._REG_DRAGON_APPERS);
@@ -3027,6 +3118,7 @@ window.setTimeout(function () {
 
             dragon.setGood(System.isLocalServer() ? DragonMonitor.getGood(dragon.getRoom()) : '[' + User.getAreaRange() + '区]' + DragonMonitor.getGood(dragon.getRoom()));
 
+            debugging('青龙信息解析成功:', dragon);
             return dragon;
         },
 
@@ -3050,72 +3142,93 @@ window.setTimeout(function () {
         }
     };
 
-    var MessageMonitor = {
+    var MessageListener = {
         _enabled: false,
 
         enable () {
             log('Message monitor enabled.');
-            MessageMonitor._enabled = true;
+            MessageListener._enabled = true;
         },
 
         disable () {
             log('Message monitor disabled.');
-            MessageMonitor._enabled = false;
+            MessageListener._enabled = false;
         },
 
-        isEnabled () {
-            return DragonMonitor.isActive() || TeamworkHelper.isInLeadMode();
+        isWorking () {
+            return DragonMonitor.isActive() ||
+                TeamworkHelper.isInLeadMode() ||
+                TeamworkHelper.Combat.isFollowingBattleActive() ||
+                TeamworkHelper.Combat.isFollowingEscapeActive();
         },
 
-        isNoise (message) {
+        isMessageInRejectList (messagePack) {
+            let type = messagePack.get('type');
+
+            if (type === 'main_msg') return false;
+            if (type === 'prompt') return false;
+
+            let subtype = messagePack.get('subtype');
+            if (type === 'vs' && subtype === 'text') return false;
+
+            return true;
+        },
+
+        isMessageInLoggingRejectedList (messagePack) {
             if (!System.readConfiguration('debugging.messageFilter')) return false;
 
             let filters = System.readConfiguration('debugging.messageFilter').split(',');
             return filters.some(function (v) {
                 if (!v.includes('|')) {
-                    return message.get('type') === v;
+                    return messagePack.get('type') === v;
                 } else {
                     let keywords = v.split('|');
-                    return message.get('type') === keywords[0] && message.get('subtype') === keywords[1];
+                    return messagePack.get('type') === keywords[0] && messagePack.get('subtype') === keywords[1];
                 }
             });
         }
     };
 
-    class MessageHandler {
-        constructor (message) {
-            this._message = message;
+    class MessageDispatcher {
+        constructor (messagePack) {
+            this._messagePack = messagePack;
         }
 
-        handle () {
-            debugging(`${this._message.get('type')}|${this._message.get('subtype')}`, this._message.elements);
+        dispatch () {
+            let message = this._messagePack.get('msg');
 
-            switch (this._message.get('type')) {
+            switch (this._messagePack.get('type')) {
                 case 'main_msg':
-                    let msg = this._message.get('msg');
-                    debugging('msg: ', msg);
-
-                    if (msg.includes('青龙会组织') && DragonMonitor.isActive() && !CombatStatus.inProgress()) {
-                        if (!System.isLocalServer() && !msg.includes(User.getAreaRange())) return;
-
-                        debugging('解析青龙信息。。。');
-                        let dragonEvent = DragonHelper.identifyDragonEvent(msg);
-                        if (dragonEvent) {
-                            let dragon = DragonHelper.parseDragonInfo(dragonEvent);
-                            debugging('青龙信息解析成功:', dragon);
-
+                    if (DragonMonitor.isActive() && DragonHelper.isValidDragonEvent(message)) {
+                        let event = DragonHelper.identifyDragonEvent(message);
+                        if (event) {
+                            let dragon = DragonHelper.parseDragonInfo(event);
                             new DragonMessageHandler(dragon).handle();
                         }
+                    } else if (TeamworkHelper.Combat.isFollowingBattleActive() && TeamworkHelper.Combat.combatEventHappened(message)) {
+                        TeamworkHelper.Combat.followBattleAction(message);
                     }
 
                     break;
                 case 'prompt':
-                    if (TeamworkHelper.isInLeadMode() && this._message.get('msg').includes('想要加入你的队伍。')) {
+                    if (TeamworkHelper.isInLeadMode() && this._messagePack.get('msg').includes('想要加入你的队伍。')) {
                         let msgTeam = System.globalObjectMap.get('msg_team');
                         if (msgTeam.get('member_num') === msgTeam.get('max_member_num')) return;
 
-                        ButtonManager.click(this._message.get('cmd1'), 0);
+                        ButtonManager.click(this._messagePack.get('cmd1'), 0);
                     }
+
+                    break;
+                case 'vs':
+                    if (this._messagePack.get('subtype') === 'text') {
+                        if (TeamworkHelper.Combat.isFollowingEscapeActive() && TeamworkHelper.Combat.escapeEventHappened(message)) {
+                            TeamworkHelper.Combat.followEscapeAction(message);
+                        }
+                    }
+
+                    break;
+                default:
+                    debugging('没有匹配到信息处理规则：' + this._messagePack.get('type'), this._messagePack);
             }
         }
     };
@@ -3804,122 +3917,6 @@ window.setTimeout(function () {
         }
     };
 
-    var AutoFollower = {
-        _autoEscape: false,
-        _autoFight: false,
-
-        async initialize () {
-            if (!System.globalObjectMap.get('msg_team')) {
-                await ButtonManager.click('team;prev;golook_room');
-            }
-
-            let teamName = System.globalObjectMap.get('msg_team').get('team_name');
-            debugging('队伍名字：' + teamName);
-            if (!teamName) {
-                window.alert('当前没加入任何队伍啊。');
-                return false;
-            }
-
-            return true;
-        },
-
-        check () {
-            if (AutoFollower._autoFight) {
-                AutoFollower.fight();
-            }
-
-            if (AutoFollower._autoEscape) {
-                AutoFollower.escape();
-            }
-        },
-
-        isActive () {
-            return AutoFollower._autoEscape || AutoFollower._autoFight;
-        },
-
-        enableAutoFight () {
-            AutoFollower._autoFight = true;
-        },
-
-        disableAutoFight () {
-            AutoFollower._autoFight = false;
-        },
-
-        enableAutoEscape () {
-            AutoFollower._autoEscape = true;
-        },
-
-        disableAutoEscape () {
-            AutoFollower._autoEscape = false;
-        },
-
-        async fight () {
-            if (CombatStatus.inProgress()) return;
-
-            action(Panels.Notices.getLatestMessages());
-
-            function action (latestMessages = []) {
-                let action = '比试';
-                let matches = null;
-                for (let i = 0; i < latestMessages.length; i++) {
-                    matches = latestMessages[i].match('(.*?)对著(.*?)说道：.*?，领教.*?高招！');
-                    if (!matches) {
-                        matches = latestMessages[i].match('(.*?)对著(.*?)喝道：.*?今日不是你死就是我活！');
-                        if (matches) {
-                            action = '杀死';
-                        }
-                    }
-
-                    if (matches && isTeamMember(matches[1])) {
-                        debugging('发现队员 ' + matches[1] + ' 发起战斗：' + matches[0]);
-                        break;
-                    }
-                }
-
-                if (matches) {
-                    Objects.Npc.action(new Npc(matches[2]), action);
-                }
-            }
-
-            function isTeamMember (playerName) {
-                return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
-            }
-        },
-
-        escape () {
-            if (!CombatStatus.inProgress()) return;
-
-            if (!ButtonManager.isButtonPressed('id-escape') && Panels.Combat.containsMessage(AutoFollower._teamLead + '一看势头不对，溜了！')) {
-                $('#id-escape').click();
-            }
-        },
-
-        performComboSkill () {
-            if (!CombatStatus.inProgress()) return;
-
-            if (rightPeople() && rightTiming()) {
-                let skill = chooseBestSkill();
-                let bufferRequired = new BufferCalculator(skill).getBufferRequired() + PerformHelper._combatSetting.getBufferReserved();
-
-                if (PerformHelper.readyToPerform(bufferRequired)) {
-                    PerformHelper.perform(skill);
-                }
-            }
-
-            function chooseBestSkill () {
-
-            }
-
-            function rightPeople () {
-
-            }
-
-            function rightTiming () {
-
-            }
-        }
-    };
-
     var PuzzleHelper = {
         _targetNpcNames: ['僧人', '侍女', '隐士', '野兔', '护卫', '尹秋水', '家丁', '护卫总管', '耶律楚哥', '易牙传人', '砍柴人', '独孤雄', '王子轩'],
         _workqueue: [],
@@ -4051,7 +4048,7 @@ window.setTimeout(function () {
             if (SnakeKiller._stop) return;
 
             await ButtonManager.click('prev;auto_fight 1;enforce 0');
-            await ButtonManager.click('golook_room');
+            await Objects.Room.refresh();
 
             let combat = new Combat();
             combat.initialize(new Npc('青竹蛇'), '杀死', ['茅山道术']);
@@ -4192,9 +4189,6 @@ window.setTimeout(function () {
     JobManager.register('id-escape', 200, EscapeHelper.escape);
 
     JobManager.register('id-repeater', 200, Repeater.fire);
-
-    JobManager.register('id-auto-follower', 200, AutoFollower.check);
-    JobManager.register('id-auto-follower-best-skill', 200, AutoFollower.performComboSkill);
 
     JobManager.register('id-follow-team-lead', 200, TeamworkHelper.follow);
 
@@ -4347,7 +4341,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置消息过滤，目前只支持 type|subtype 级别。当前设定为 ' + System.readConfiguration('debugging.messageFilter'),
+            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.readConfiguration('debugging.messageFilter'),
             width: '10px',
             id: 'id-debugging-setting',
 
@@ -5203,7 +5197,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             async eventOnClick () {
-                await ButtonManager.click('golook_room');
+                await Objects.Room.refresh();
 
                 if (Objects.Room.isSecurePlace() && !window.confirm('当前还在秘境里，确定离开？')) {
                     return;
@@ -5247,7 +5241,7 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    await ButtonManager.click('golook_room');
+                    await Objects.Room.refresh();
                     if (!Objects.Room.isSecurePlace()) {
                         window.alert('当前不在秘境里');
                         ButtonManager.resetButtonById(this.id);
@@ -5280,7 +5274,7 @@ window.setTimeout(function () {
             id: 'id-auto-sweep-setting',
 
             async eventOnClick () {
-                await ButtonManager.click('golook_room');
+                await Objects.Room.refresh();
                 if (!Objects.Room.isSecurePlace()) {
                     window.alert('当前不在秘境里。');
                     return;
@@ -5713,18 +5707,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (!await AutoFollower.initialize()) {
-                        ButtonManager.resetButtonById(this.id);
-                        return;
-                    }
-
-                    if (!AutoFollower.isActive()) JobManager.getJob('id-auto-follower').start();
-
-                    AutoFollower.enableAutoFight();
+                    TeamworkHelper.Combat.startFollowingBattle();
                 } else {
-                    AutoFollower.disableAutoFight();
-
-                    if (!AutoFollower.isActive()) JobManager.getJob('id-auto-follower').stop();
+                    TeamworkHelper.Combat.stopFollowingBattle();
                 }
             }
         }, {
@@ -5735,19 +5720,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (!await AutoFollower.initialize()) {
-                        ButtonManager.resetButtonById(this.id);
-                        return;
-                    }
-
-                    if (!AutoFollower.isActive()) JobManager.getJob('id-auto-follower').start();
-
-                    AutoFollower.enableAutoEscape();
+                    TeamworkHelper.Combat.startFollowingEscape();
                 } else {
-                    AutoFollower.disableAutoEscape();
-                    ButtonManager.resetButtonById('id-escape');
-
-                    if (!AutoFollower.isActive()) JobManager.getJob('id-auto-follower').stop();
+                    TeamworkHelper.Combat.stopFollowingEscape();
                 }
             }
         }, {
@@ -6215,11 +6190,15 @@ window.setTimeout(function () {
     document.title = User.getNickName();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
-    window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
-        this.originalDispatchMessage(message);
+    window.unsafeWindow.gSocketMsg.dispatchMessage = function (messagePack) {
+        this.originalDispatchMessage(messagePack);
 
-        if (MessageMonitor.isEnabled() && !MessageMonitor.isNoise(message)) {
-            new MessageHandler(message).handle();
+        if (MessageListener.isWorking() && !MessageListener.isMessageInRejectList(messagePack)) {
+            new MessageDispatcher(messagePack).dispatch();
+        }
+
+        if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
+            debugging(`${messagePack.get('type')}|${messagePack.get('subtype')}|${messagePack.get('msg')}`, messagePack.elements);
         }
     };
 }, 1000);
