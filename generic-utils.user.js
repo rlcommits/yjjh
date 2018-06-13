@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.22
+// @version      2.1.23
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1747,7 +1747,7 @@ window.setTimeout(function () {
 
         async fire () {
             if (!this._npc.getId()) {
-                debugging('Combat::fire:npc ' + this._npc.getName() + ' is not available.');
+                debugging(`npc ${this._npc.toString()} 不在现场。`);
                 return false;
             } else {
                 await Objects.Npc.action(this._npc, this._action);
@@ -1770,13 +1770,14 @@ window.setTimeout(function () {
 
             if (this._additionalStopEvent && this._additionalStopEvent.getCriterial()()) {
                 this._additionalStopEvent.getAction()();
-            } else {
+            } else if (!CombatHelper.isAutoPerformingEnabled()) {
                 if (!skills || skills.length === 0) {
                     skills = Panels.Combat.getAvailableAttackSkills()[0];
+                    debugging(`战斗发起时未指定技能，脚本自动选取一个可用的攻击技能 ${skills}。`);
                 }
 
                 if (PerformHelper.readyToPerform(new BufferCalculator(skills).getBufferRequired() + bufferReserved)) {
-                    debugging('prepare skills=' + skills);
+                    debugging(`技能 ${skills} 准备就绪。`);
                     PerformHelper.perform(skills);
                 }
             }
@@ -1796,7 +1797,7 @@ window.setTimeout(function () {
 
         readyToStop () {
             let result = this._stop || CombatStatus.justFinished();
-            if (result) debugging('Combat::readyToStop=true');
+            if (result) debugging('战斗停止条件达成。');
 
             return result;
         }
@@ -1965,6 +1966,10 @@ window.setTimeout(function () {
             }
         },
 
+        isAutoPerformingEnabled () {
+            return CombatHelper._autoPerforming;
+        },
+
         enableAutoPerforming () {
             CombatHelper._autoPerforming = true;
         },
@@ -2004,14 +2009,12 @@ window.setTimeout(function () {
         perform (skills) {
             if (!Array.isArray(skills)) skills = [skills];
 
-            debugging('performing skills ' + skills);
+            debugging('发出招式： ' + skills);
             let links = Panels.Combat.getSkillLinksV2(skills);
             if (links.length > 0) {
-                debugging('links=' + links);
                 ExecutionManager.execute(links);
             } else {
                 let firstSkill = Panels.Combat.getAvailableAttackSkills()[0];
-                debugging('first skill=' + firstSkill);
                 if (firstSkill) PerformHelper.perform(firstSkill);
             }
         },
@@ -2466,8 +2469,6 @@ window.setTimeout(function () {
             },
 
             async action (npc, action, times = 1) {
-                debugging(action + ' ' + npc.getName() + (times > 1 ? ', times=' + times : ''));
-
                 switch (action) {
                     case '对话':
                         for (let i = 0; i < times; i++) {
