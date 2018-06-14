@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.26
+// @version      2.1.27
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -79,6 +79,18 @@ window.setTimeout(function () {
             return User.getArea() < 1000;
         },
 
+        setDebugMessageBlacklist (blacklist) {
+            System.setVariant(System.keys.DEBUG_MESSAGE_REJECTED, blacklist);
+        },
+
+        getDebugMessageBlacklist () {
+            let blacklist = System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED);
+
+            if (blacklist || blacklist === '') return blacklist;
+
+            return 'attrs_changed,channel|rumor,attr';
+        },
+
         keys: {
             ATTACK_SKILLS: 'attack.skills',
             ATTACK_SKILLS_BUFFER_RESERVED: 'attack.skills.buffer.reserved',
@@ -90,7 +102,8 @@ window.setTimeout(function () {
             DRAGON_REG_EXCLUDED: 'dragon.reg.excluded',
             DRAGON_REG_EXCLUDED_REMOTE: 'dragon.reg.excluded.remote',
             RECOVERY_SKILL: 'recovery.skill',
-            RECOVERY_THRESHOLD: 'recovery.threshold'
+            RECOVERY_THRESHOLD: 'recovery.threshold',
+            DEBUG_MESSAGE_REJECTED: 'debug.message.rejected'
         }
     };
 
@@ -116,6 +129,7 @@ window.setTimeout(function () {
                 log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
                 log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
                 log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
+                log(`调试信息屏蔽：${System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED)}`);
             }
 
             async function analyseEnforce () {
@@ -1126,6 +1140,7 @@ window.setTimeout(function () {
         isCommandValid () {
             if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
             if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。')) return true;
+            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
 
             debugging('不是一个合理的行动命令。');
         }
@@ -1134,12 +1149,15 @@ window.setTimeout(function () {
             debugging('判定团队行动：' + this._message);
 
             let matches = null;
-            if (this._message.includes('走一步') && TeamworkHelper.Move.isMovingWithTeamleadActive()) {
+            if (this._message.includes('走一步') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
                 matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
                 Navigation.move(new Direction(matches[2]).getCode());
             } else if (this._message.includes('杀死') || this._message.includes('比试')) {
                 matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。');
                 TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
+            } else if (this._message.includes('出发前往') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
+                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。');
+                Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
             }
         }
     };
@@ -1203,8 +1221,6 @@ window.setTimeout(function () {
             },
 
             isMyBattleEvent (message) {
-                if (!message) return false;
-
                 return message.match('你对著(.*?)喝道：.*?今日不是你死就是我活！|你对著(.*?)说道：.*?，领教.*?高招！');
             },
 
@@ -1233,7 +1249,7 @@ window.setTimeout(function () {
                 }
             },
 
-            async notifyTeam (messageWithColor) {
+            async notifyTeamForBattle (messageWithColor) {
                 let message = System.replaceControlCharBlank(messageWithColor);
                 let action = message.includes('不是你死就是我活') ? '杀死' : '比试';
                 let matches = action === '杀死' ? message.match('你对著(.*?)喝道：.*?今日不是你死就是我活！') : message.match('你对著(.*?)说道：.*?，领教.*?高招！');
@@ -1291,7 +1307,7 @@ window.setTimeout(function () {
             }
         },
 
-        Move: {
+        Navigation: {
             startMovingWithTeamlead () {
                 TeamworkHelper._moveWithTeamLead = true;
             },
@@ -1304,11 +1320,19 @@ window.setTimeout(function () {
                 return TeamworkHelper._moveWithTeamLead;
             },
 
-            async go (directionDiscription) {
+            async goto (event) {
+                Navigation.move(PathManager.getPathForSpecificEvent(event));
+
+                if (TeamworkHelper.Role.isTeamLead(User.getName()) && TeamworkHelper.isTeamworkModeOn()) {
+                    TeamworkHelper.Navigation.notifyTeamForSpecialEvent(event);
+                }
+            },
+
+            async move (directionDiscription) {
                 await Navigation.move(new Direction(directionDiscription).getCode());
 
                 if (TeamworkHelper.Role.isTeamLead(User.getName())) {
-                    TeamworkHelper.Move.notifyTeam(directionDiscription);
+                    TeamworkHelper.Navigation.notifyTeamForMove(directionDiscription);
                 }
 
                 if (TeamworkHelper._autoKill) {
@@ -1328,8 +1352,12 @@ window.setTimeout(function () {
                 }
             },
 
-            notifyTeam (directionDiscription) {
+            notifyTeamForMove (directionDiscription) {
                 TeamworkHelper._teamChat(`全体注意，往${directionDiscription}走一步。`);
+            },
+
+            notifyTeamForSpecialEvent (event) {
+                TeamworkHelper._teamChat(`全体注意，出发前往${event}。`);
             }
         },
 
@@ -2724,6 +2752,7 @@ window.setTimeout(function () {
                     await ExecutionManager.wait(interval);
                 }
 
+                await Objects.Room.refresh();
                 if (!Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero')).length) {
                     await Navigation.move(MapCleanerV2._path.shift());
                 }
@@ -3267,9 +3296,9 @@ window.setTimeout(function () {
         },
 
         isMessageInLoggingRejectedList (messagePack) {
-            if (!System.getVariant('debugging.messageFilter')) return false;
+            if (!System.getDebugMessageBlacklist()) return false;
 
-            let filters = System.getVariant('debugging.messageFilter').split(',');
+            let filters = System.getDebugMessageBlacklist().split(',');
             return filters.some(function (v) {
                 if (!v.includes('|')) {
                     return messagePack.get('type') === v;
@@ -3311,8 +3340,10 @@ window.setTimeout(function () {
                     break;
                 case 'vs':
                     if (this._messagePack.get('subtype') === 'text') {
+                        if (!message) return;
+
                         if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Combat.isMyBattleEvent(message)) {
-                            TeamworkHelper.Combat.notifyTeam(message);
+                            TeamworkHelper.Combat.notifyTeamForBattle(message);
                         } else if (TeamworkHelper.Combat.isFollowingEscapeActive() && TeamworkHelper.Combat.escapeEventHappened(message)) {
                             TeamworkHelper.Combat.followEscapeAction(message);
                         }
@@ -4013,7 +4044,13 @@ window.setTimeout(function () {
                 '苗疆密林': 'se;s;s;e;n;n;e',
                 '苗疆草地': 's;e;ne;s;sw;e;e;ne',
                 '苗疆沼泽': 'ne;nw;ne;ne;n;n;w',
-                '山坳年兽': 'jh 1;e;#5 n'
+                '山坳年兽': 'jh 1;e;#5 n',
+
+                '恒山武安君庙': 'jh 9;event_1_20960851',
+                '青城孽龙': 'jh 15;n;nw;w;nw;n;event_1_14401179',
+                '峨嵋军阵钓鱼山脚': 'jh 8;ne;#3 e;n',
+                '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
+                '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w'
             }
         }
     };
@@ -4439,16 +4476,14 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.getVariant('debugging.messageFilter'),
+            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.getDebugMessageBlacklist(),
             width: '10px',
             id: 'id-debugging-setting',
 
             async eventOnClick () {
-                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.getVariant('debugging.messageFilter'));
-                if (answer) {
-                    System.setVariant('debugging.messageFilter', answer);
-                } else if (answer === '') {
-                    System.setVariant('debugging.messageFilter', '');
+                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.getDebugMessageBlacklist());
+                if (answer || answer === '') {
+                    System.setDebugMessageBlacklist(answer);
                 }
             }
         }, {
@@ -5206,7 +5241,7 @@ window.setTimeout(function () {
             title: '一键从任意处到青城孽龙所在地...',
 
             eventOnClick () {
-                Navigation.move('jh 15;n;nw;w;nw;n;event_1_14401179');
+                TeamworkHelper.Navigation.goto('青城孽龙');
             }
         }, {
             label: '恒',
@@ -5214,7 +5249,7 @@ window.setTimeout(function () {
             title: '一键从任意处到恒山武安君庙...',
 
             eventOnClick () {
-                Navigation.move('jh 9;event_1_20960851');
+                TeamworkHelper.Navigation.goto('恒山武安君庙');
             }
         }, {
             label: '峨',
@@ -5223,7 +5258,7 @@ window.setTimeout(function () {
             title: '一键从任意处到峨嵋军阵钓鱼山脚...',
 
             eventOnClick () {
-                Navigation.move('jh 8;ne;#3 e;n');
+                TeamworkHelper.Navigation.goto('峨嵋军阵钓鱼山脚');
             }
         }, {
             label: '劳',
@@ -5236,7 +5271,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                Navigation.move('e;e;n;event_1_19360932 go');
+                TeamworkHelper.Navigation.goto('峨嵋军阵劳军');
             }
         }, {
             label: '驼',
@@ -5245,7 +5280,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                Navigation.move('jh 21;#4 n;w');
+                TeamworkHelper.Navigation.goto('白驼闯阵入口青铜盾阵');
             }
         }, {
             label: '鸟',
@@ -5845,9 +5880,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    TeamworkHelper.Move.startMovingWithTeamlead();
+                    TeamworkHelper.Navigation.startMovingWithTeamlead();
                 } else {
-                    TeamworkHelper.Move.stopMovingWithTeamlead();
+                    TeamworkHelper.Navigation.stopMovingWithTeamlead();
                 }
             }
         }, {
@@ -5857,7 +5892,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('西北');
+                TeamworkHelper.Navigation.move('西北');
             }
         }, {
             label: '上',
@@ -5866,7 +5901,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('北');
+                TeamworkHelper.Navigation.move('北');
             }
         }, {
             label: '↗',
@@ -5874,7 +5909,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('东北');
+                TeamworkHelper.Navigation.move('东北');
             }
         }, {
             label: '左',
@@ -5883,7 +5918,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('西');
+                TeamworkHelper.Navigation.move('西');
             }
         }, {
             label: '杀',
@@ -5909,7 +5944,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('东');
+                TeamworkHelper.Navigation.move('东');
             }
         }, {
             label: '↙',
@@ -5918,7 +5953,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('西南');
+                TeamworkHelper.Navigation.move('西南');
             }
         }, {
             label: '下',
@@ -5927,7 +5962,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('南');
+                TeamworkHelper.Navigation.move('南');
             }
         }, {
             label: '↘',
@@ -5935,7 +5970,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.Move.go('东南');
+                TeamworkHelper.Navigation.move('东南');
             }
         }, {
             label: '自动杀',
