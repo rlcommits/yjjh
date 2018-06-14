@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.25
+// @version      2.1.26
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -105,7 +105,7 @@ window.setTimeout(function () {
             await analyseEnforce();
             await Objects.Room.refresh();
 
-            document.title = User.getNickName();
+            document.title = User.getName();
 
             logCurrentSettings();
 
@@ -136,7 +136,7 @@ window.setTimeout(function () {
             }
         },
 
-        getNickName () {
+        getName () {
             return System.globalObjectMap.get('msg_attrs').get('name');
         },
 
@@ -1118,12 +1118,60 @@ window.setTimeout(function () {
         }
     };
 
+    class TeamworkCommandParser {
+        constructor (messageWithColor) {
+            this._message = System.replaceControlCharBlank(messageWithColor);
+        }
+
+        isCommandValid () {
+            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
+            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。')) return true;
+
+            debugging('不是一个合理的行动命令。');
+        }
+
+        action () {
+            debugging('判定团队行动：' + this._message);
+
+            let matches = null;
+            if (this._message.includes('走一步') && TeamworkHelper.Move.isMovingWithTeamleadActive()) {
+                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
+                Navigation.move(new Direction(matches[2]).getCode());
+            } else if (this._message.includes('杀死') || this._message.includes('比试')) {
+                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。');
+                TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
+            }
+        }
+    };
+
     var TeamworkHelper = {
         _autoKill: false,
-        _leadMode: false,
+        _acceptAnyJoinRequest: false,
+        _teamworkModeOn: false,
+        _moveWithTeamLead: false,
 
-        isTeamMember (playerName) {
-            return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
+        startTeamworkMode (acceptAnyTeamJoinRequest = false) {
+            TeamworkHelper._teamworkModeOn = true;
+            TeamworkHelper._acceptAnyJoinRequest = acceptAnyTeamJoinRequest;
+        },
+
+        stopTeamworkMode () {
+            TeamworkHelper._teamworkModeOn = false;
+            TeamworkHelper._acceptAnyJoinRequest = false;
+        },
+
+        isTeamworkModeOn () {
+            return TeamworkHelper._teamworkModeOn;
+        },
+
+        Role: {
+            isTeamMember (playerName) {
+                return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
+            },
+
+            isTeamLead (playerName) {
+                return System.globalObjectMap.get('msg_team').get('member1').split(',')[1] === playerName;
+            }
         },
 
         Combat: {
@@ -1154,26 +1202,16 @@ window.setTimeout(function () {
                 TeamworkHelper.Combat._isFollowingEscapeActive = false;
             },
 
-            combatEventHappened (message) {
-                return message.match('(.*?)对著(.*?)喝道：.*?今日不是你死就是我活！|(.*?)对著(.*?)说道：.*?，领教.*?高招！');
+            isMyBattleEvent (message) {
+                if (!message) return false;
+
+                return message.match('你对著(.*?)喝道：.*?今日不是你死就是我活！|你对著(.*?)说道：.*?，领教.*?高招！');
             },
 
-            async followBattleAction (messageWithColor) {
-                let message = System.replaceControlCharBlank(messageWithColor);
-                let matches = null;
-                let action = message.includes('不是你死就是我活') ? '杀死' : '比试';
-
-                if (action === '杀死') {
-                    matches = message.match('(.*?)对著(.*?)喝道：.*?今日不是你死就是我活！');
-                } else {
-                    matches = message.match('(.*?)对著(.*?)说道：.*?，领教.*?高招！');
-                }
-
-                if (matches && TeamworkHelper.isTeamMember(matches[1])) {
-                    debugging('发现队员 ' + matches[1] + ' 发起战斗：', matches);
-                    await Objects.Room.refresh();
-                    Objects.Npc.action(new Npc(matches[2]), action);
-                }
+            async followBattleAction (firer, action, npcName) {
+                debugging(`准备跟随${firer}发起${action}${npcName}的战斗！`);
+                await Objects.Room.refresh();
+                Objects.Npc.action(new Npc(npcName), action);
             },
 
             escapeEventHappened (message) {
@@ -1185,7 +1223,7 @@ window.setTimeout(function () {
 
                 let message = System.replaceControlCharBlank(messageWithColor);
                 let matches = message.match('(.*?)一看势头不对，溜了！');
-                if (matches && TeamworkHelper.isTeamMember(matches[1])) {
+                if (matches && TeamworkHelper.Role.isTeamMember(matches[1])) {
                     let escape = new Retry(200);
                     escape.initialize(function () {
                         ButtonManager.click('escape');
@@ -1193,6 +1231,14 @@ window.setTimeout(function () {
 
                     await escape.fire();
                 }
+            },
+
+            async notifyTeam (messageWithColor) {
+                let message = System.replaceControlCharBlank(messageWithColor);
+                let action = message.includes('不是你死就是我活') ? '杀死' : '比试';
+                let matches = action === '杀死' ? message.match('你对著(.*?)喝道：.*?今日不是你死就是我活！') : message.match('你对著(.*?)说道：.*?，领教.*?高招！');
+
+                TeamworkHelper._teamChat(`全体注意，${action}${matches[1]}。 `);
             }
         },
 
@@ -1204,83 +1250,91 @@ window.setTimeout(function () {
             TeamworkHelper._autoKill = false;
         },
 
-        setLeadMode (leadMode) {
-            TeamworkHelper._leadMode = leadMode;
+        isAnyTeamJoinRequestAccpted () {
+            return TeamworkHelper._acceptAnyJoinRequest;
         },
 
-        isInLeadMode () {
-            return TeamworkHelper._leadMode;
+        Constructure: {
+            async createTeamIfNeeded () {
+                if (!System.globalObjectMap.get('msg_team').get('team_id')) {
+                    if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
+                        ButtonManager.resetButtonById('id-team-lead');
+                        return;
+                    }
+
+                    await ButtonManager.click('team create;prev');
+                }
+            },
+
+            identifyTeamLeadName (teamLeadName) {
+                let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`,${teamLeadName},`));
+                if (targetUser.length) {
+                    let userInfo = targetUser[0]['value'].split(',');
+
+                    System.setVariant(System.keys.TEAMWORK_LEAD_NAME, userInfo[1]);
+                    System.setVariant(System.keys.TEAMWORK_LEAD_ID, userInfo[0]);
+
+                    return true;
+                }
+            },
+
+            requestToJoin () {
+                ButtonManager.click(`team join ${TeamworkHelper.Constructure.getTeamLeadId()}`);
+            },
+
+            getTeamLeadName () {
+                return System.getVariant(System.keys.TEAMWORK_LEAD_NAME);
+            },
+
+            getTeamLeadId () {
+                return System.getVariant(System.keys.TEAMWORK_LEAD_ID);
+            }
         },
 
-        async createTeamIfNeeded () {
-            if (!System.globalObjectMap.get('msg_team').get('team_id')) {
-                if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
-                    ButtonManager.resetButtonById('id-team-lead');
-                    return;
+        Move: {
+            startMovingWithTeamlead () {
+                TeamworkHelper._moveWithTeamLead = true;
+            },
+
+            stopMovingWithTeamlead () {
+                TeamworkHelper._moveWithTeamLead = false;
+            },
+
+            isMovingWithTeamleadActive () {
+                return TeamworkHelper._moveWithTeamLead;
+            },
+
+            async go (directionDiscription) {
+                await Navigation.move(new Direction(directionDiscription).getCode());
+
+                if (TeamworkHelper.Role.isTeamLead(User.getName())) {
+                    TeamworkHelper.Move.notifyTeam(directionDiscription);
                 }
 
-                await ButtonManager.click('team create;prev');
-            }
-        },
+                if (TeamworkHelper._autoKill) {
+                    await ExecutionManager.wait(1500);
+                    $('#id-room-cleaner').click();
+                }
+            },
 
-        identifyTeamLeadName (teamLeadName) {
-            let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`,${teamLeadName},`));
-            if (targetUser.length) {
-                let userInfo = targetUser[0]['value'].split(',');
+            async follow (message) {
+                if (System.globalObjectMap.get('msg_room').get('map_id') === 'shenshousenlin') return;
 
-                System.setVariant(System.keys.TEAMWORK_LEAD_NAME, userInfo[1]);
-                System.setVariant(System.keys.TEAMWORK_LEAD_ID, userInfo[0]);
-
-                return true;
-            }
-        },
-
-        getTeamLeadName () {
-            return System.getVariant(System.keys.TEAMWORK_LEAD_NAME);
-        },
-
-        getTeamLeadId () {
-            return System.getVariant(System.keys.TEAMWORK_LEAD_ID);
-        },
-
-        async move (direction) {
-            await ButtonManager.click(direction);
-            await TeamworkHelper.notifyTeam(TeamworkHelper._createCommand(direction));
-
-            if (TeamworkHelper._autoKill) {
-                await ExecutionManager.wait(1500);
-                $('#id-room-cleaner').click();
-            }
-        },
-
-        async notifyTeam (message) {
-            await ButtonManager.click(`team chat ${message}`);
-        },
-
-        _createCommand (direction) {
-            return new Date().getTime() + '@' + direction + '@';
-        },
-
-        _steps: [],
-        follow () {
-            if (System.globalObjectMap.get('msg_room').get('map_id') === 'shenshousenlin') return;
-
-            let latestMessages = Panels.Notices.getMessages('【队伍】(.*?)：(.*)');
-            if (latestMessages.length === 0) return;
-
-            let matches = latestMessages[0].match('【队伍】(.*?)：(.*?)@(n|w|s|e|ne|sw|se|nw)@');
-            if (matches) {
-                let timestampDiff = new Date().getTime() - parseInt(matches[2]);
-                if (timestampDiff <= 8000) {
+                let matches = message.match('^【队伍】(.*?)：(.*?) $');
+                if (matches && TeamworkHelper.Role.isTeamLead(matches[1])) {
                     if (!Objects.Room.getPlayers().includes(matches[1])) {
-                        ButtonManager.click(matches[3], 0);
+                        await Navigation.move(new Direction(matches[2]).getCode);
                     }
                 }
+            },
+
+            notifyTeam (directionDiscription) {
+                TeamworkHelper._teamChat(`全体注意，往${directionDiscription}走一步。`);
             }
         },
 
-        requestToJoin () {
-            ButtonManager.click(`team join ${TeamworkHelper.getTeamLeadId()}`);
+        _teamChat (command) {
+            ButtonManager.click(`team chat ${command}`);
         }
     };
 
@@ -3193,7 +3247,8 @@ window.setTimeout(function () {
 
         isWorking () {
             return DragonMonitor.isActive() ||
-                TeamworkHelper.isInLeadMode() ||
+                TeamworkHelper.isTeamworkModeOn() ||
+                TeamworkHelper.isAnyTeamJoinRequestAccpted() ||
                 TeamworkHelper.Combat.isFollowingBattleActive() ||
                 TeamworkHelper.Combat.isFollowingEscapeActive();
         },
@@ -3206,6 +3261,7 @@ window.setTimeout(function () {
 
             let subtype = messagePack.get('subtype');
             if (type === 'vs' && subtype === 'text') return false;
+            if (type === 'channel' && subtype === 'team') return false;
 
             return true;
         },
@@ -3241,13 +3297,11 @@ window.setTimeout(function () {
                             let dragon = DragonHelper.parseDragonInfo(event);
                             new DragonMessageHandler(dragon).handle();
                         }
-                    } else if (TeamworkHelper.Combat.isFollowingBattleActive() && TeamworkHelper.Combat.combatEventHappened(message)) {
-                        TeamworkHelper.Combat.followBattleAction(message);
                     }
 
                     break;
                 case 'prompt':
-                    if (TeamworkHelper.isInLeadMode() && this._messagePack.get('msg').includes('想要加入你的队伍。')) {
+                    if (TeamworkHelper.isAnyTeamJoinRequestAccpted() && this._messagePack.get('msg').includes('想要加入你的队伍。')) {
                         let msgTeam = System.globalObjectMap.get('msg_team');
                         if (msgTeam.get('member_num') === msgTeam.get('max_member_num')) return;
 
@@ -3257,8 +3311,19 @@ window.setTimeout(function () {
                     break;
                 case 'vs':
                     if (this._messagePack.get('subtype') === 'text') {
-                        if (TeamworkHelper.Combat.isFollowingEscapeActive() && TeamworkHelper.Combat.escapeEventHappened(message)) {
+                        if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Combat.isMyBattleEvent(message)) {
+                            TeamworkHelper.Combat.notifyTeam(message);
+                        } else if (TeamworkHelper.Combat.isFollowingEscapeActive() && TeamworkHelper.Combat.escapeEventHappened(message)) {
                             TeamworkHelper.Combat.followEscapeAction(message);
+                        }
+                    }
+
+                    break;
+                case 'channel':
+                    if (this._messagePack.get('subtype') === 'team') {
+                        let command = new TeamworkCommandParser(message);
+                        if (command.isCommandValid()) {
+                            command.action();
                         }
                     }
 
@@ -4223,10 +4288,7 @@ window.setTimeout(function () {
     JobManager.register('id-leftover-tasks', 1000 * 60, LeftoverChecker.fire);
 
     JobManager.register('id-escape', 200, EscapeHelper.escape);
-
     JobManager.register('id-repeater', 200, Repeater.fire);
-
-    JobManager.register('id-follow-team-lead', 200, TeamworkHelper.follow);
 
     var helperConfigurations = [{
         subject: '其他项目',
@@ -4584,11 +4646,11 @@ window.setTimeout(function () {
                     await ButtonManager.click('event_1_36344468');
                     await ExecutionManager.wait(1000);
 
-                    document.title = User.getNickName() + '-跨服';
+                    document.title = User.getName() + '-跨服';
                     $('#id-equipment-for-combat').click();
                 } else {
                     await Navigation.move('home;home;home;home');
-                    document.title = User.getNickName();
+                    document.title = User.getName();
 
                     DragonMonitor.resetMonitoringSettings();
                 }
@@ -5672,15 +5734,15 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: TeamworkHelper.getTeamLeadName() ? `加${TeamworkHelper.getTeamLeadName().substr(0, 1)}队` : '加队伍',
+            label: TeamworkHelper.Constructure.getTeamLeadName() ? `加${TeamworkHelper.Constructure.getTeamLeadName().substr(0, 1)}队` : '加队伍',
             title: '一键向设定好的队长发起组队请求\n\n注意：\n队长必须在“将”模式开启情况下才能自动批准入队',
             id: 'id-join-team',
             width: '60px',
             marginRight: '1px',
 
             eventOnClick () {
-                if (TeamworkHelper.getTeamLeadId()) {
-                    TeamworkHelper.requestToJoin();
+                if (TeamworkHelper.Constructure.getTeamLeadId()) {
+                    TeamworkHelper.Constructure.requestToJoin();
                 } else {
                     $('#id-join-team-setting').click();
                 }
@@ -5692,10 +5754,10 @@ window.setTimeout(function () {
             width: '10px',
 
             async eventOnClick () {
-                let answer = window.prompt('请输入常用队长名字：\n\n注意：必须是好友', TeamworkHelper.getTeamLeadName());
+                let answer = window.prompt('请输入常用队长名字：\n\n注意：必须是好友', TeamworkHelper.Constructure.getTeamLeadName());
                 if (!answer) return;
 
-                if (!await TeamworkHelper.identifyTeamLeadName(answer)) {
+                if (!await TeamworkHelper.Constructure.identifyTeamLeadName(answer)) {
                     window.alert(`当前好友列表里找不到名字为 ${answer} 的好友，请检查拼写。`);
                     return;
                 }
@@ -5712,15 +5774,15 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    await TeamworkHelper.createTeamIfNeeded();
-
-                    TeamworkHelper.setLeadMode(true);
+                    await TeamworkHelper.Constructure.createTeamIfNeeded();
 
                     ButtonManager.resetButtonById('id-team-member');
                     ButtonManager.pressDown('id-recover-hp-mp');
                     ButtonManager.pressDown('id-auto-follower-fight');
+
+                    TeamworkHelper.startTeamworkMode(true);
                 } else {
-                    TeamworkHelper.setLeadMode(false);
+                    TeamworkHelper.stopTeamworkMode();
 
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     ButtonManager.resetButtonById('id-auto-follower-fight');
@@ -5739,7 +5801,11 @@ window.setTimeout(function () {
                     ButtonManager.pressDown('id-recover-hp-mp');
                     ButtonManager.pressDown('id-auto-follower-fight');
                     ButtonManager.pressDown('id-follow-team-lead');
+
+                    TeamworkHelper.startTeamworkMode(false);
                 } else {
+                    TeamworkHelper.stopTeamworkMode();
+
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     ButtonManager.resetButtonById('id-auto-follower-fight');
                     ButtonManager.resetButtonById('id-follow-team-lead');
@@ -5778,7 +5844,11 @@ window.setTimeout(function () {
             id: 'id-follow-team-lead',
 
             async eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    TeamworkHelper.Move.startMovingWithTeamlead();
+                } else {
+                    TeamworkHelper.Move.stopMovingWithTeamlead();
+                }
             }
         }, {
             label: '↖',
@@ -5787,7 +5857,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.move('nw');
+                TeamworkHelper.Move.go('西北');
             }
         }, {
             label: '上',
@@ -5796,7 +5866,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.move('n');
+                TeamworkHelper.Move.go('北');
             }
         }, {
             label: '↗',
@@ -5804,7 +5874,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.move('ne');
+                TeamworkHelper.Move.go('东北');
             }
         }, {
             label: '左',
@@ -5813,7 +5883,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.move('w');
+                TeamworkHelper.Move.go('西');
             }
         }, {
             label: '杀',
@@ -5839,7 +5909,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.move('e');
+                TeamworkHelper.Move.go('东');
             }
         }, {
             label: '↙',
@@ -5848,7 +5918,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.move('sw');
+                TeamworkHelper.Move.go('西南');
             }
         }, {
             label: '下',
@@ -5857,7 +5927,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             eventOnClick () {
-                TeamworkHelper.move('s');
+                TeamworkHelper.Move.go('南');
             }
         }, {
             label: '↘',
@@ -5865,7 +5935,7 @@ window.setTimeout(function () {
             width: '24px',
 
             eventOnClick () {
-                TeamworkHelper.move('se');
+                TeamworkHelper.Move.go('东南');
             }
         }, {
             label: '自动杀',
