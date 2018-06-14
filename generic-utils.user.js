@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.27
+// @version      2.1.28
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -517,11 +517,42 @@ window.setTimeout(function () {
 
     var GenericTaskManager = {
         _tasksNotSupported: [],
+        _automationActive: false,
 
         Types: {
             FIGHT_OR_GET: 1,
             PURCHASE: 2,
             BODY: 3
+        },
+
+        startAutomation () {
+            GenericTaskManager._automationActive = true;
+        },
+
+        stopAutomation () {
+            GenericTaskManager._automationActive = false;
+        },
+
+        isAutomationActive () {
+            return GenericTaskManager._automationActive;
+        },
+
+        isTaskDone (messageWithColor) {
+            if (!messageWithColor) return false;
+
+            return messageWithColor.includes('恭喜你完成');
+        },
+
+        async triggerNext (messageWithColor) {
+            let matches = messageWithColor.match('恭喜你完成(.*?)任务');
+            if (!matches) return;
+
+            await ExecutionManager.wait(1500);
+            if (matches[1] === '帮派') {
+                $('#id-task-clan').click();
+            } else {
+                $('#id-task-master').click();
+            }
         },
 
         async handleTask () {
@@ -3326,6 +3357,8 @@ window.setTimeout(function () {
                             let dragon = DragonHelper.parseDragonInfo(event);
                             new DragonMessageHandler(dragon).handle();
                         }
+                    } else if (GenericTaskManager.isAutomationActive() && GenericTaskManager.isTaskDone(message)) {
+                        GenericTaskManager.triggerNext(message);
                     }
 
                     break;
@@ -5478,9 +5511,22 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '自动继续',
+            title: '本按钮按下时，师门和帮派任务会自动尝试下一个，直到失败。',
+            id: 'id-master-clan-task-automation',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    GenericTaskManager.startAutomation();
+                } else {
+                    GenericTaskManager.stopAutomation();
+                }
+            }
+        }, {
             label: '师',
             title: '每点一次自动申领并完成一个师门任务（战斗、购买、拾物及搜身类均已支持）。\n\n注意：\n1. 考虑到地图路径还不完全，当前版本暂不支持一键全自动所有任务。\n2. 少量任务会自动消耗引路蜂\n3. 脚本自动判断第 25 个时 vip 点掉并继续第 26 个\n\n如有发现某个任务无法完成，请告知任务信息比如 \'给我在19分20秒内杀乞丐。任务所在地方好像是：大昭寺-八角街\'',
             width: '38px',
+            id: 'id-task-master',
             marginRight: '1px',
 
             async eventOnClick () {
@@ -5498,6 +5544,7 @@ window.setTimeout(function () {
         }, {
             label: '帮',
             title: '和师门任务类似，所有功能通用',
+            id: 'id-task-clan',
             width: '38px',
 
             async eventOnClick () {
