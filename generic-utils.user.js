@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.28
+// @version      2.1.29
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -526,10 +526,12 @@ window.setTimeout(function () {
         },
 
         startAutomation () {
+            log('自动帮派/师门任务开启...');
             GenericTaskManager._automationActive = true;
         },
 
         stopAutomation () {
+            log('自动帮派/师门任务停止...');
             GenericTaskManager._automationActive = false;
         },
 
@@ -547,6 +549,7 @@ window.setTimeout(function () {
             let matches = messageWithColor.match('恭喜你完成(.*?)任务');
             if (!matches) return;
 
+            debugging('检测到任务完成，自动触发下一个任务...');
             await ExecutionManager.wait(1500);
             if (matches[1] === '帮派') {
                 $('#id-task-clan').click();
@@ -3309,6 +3312,7 @@ window.setTimeout(function () {
             return DragonMonitor.isActive() ||
                 TeamworkHelper.isTeamworkModeOn() ||
                 TeamworkHelper.isAnyTeamJoinRequestAccpted() ||
+                GenericTaskManager.isAutomationActive() ||
                 TeamworkHelper.Combat.isFollowingBattleActive() ||
                 TeamworkHelper.Combat.isFollowingEscapeActive();
         },
@@ -3644,6 +3648,7 @@ window.setTimeout(function () {
                 _BODY: {
                     '雪亭镇-木屋-花不为': 'jh 1;e;#4 n;e',
                     '雪亭镇-雪亭镇街道-农夫': 'jh 1;e;s;w',
+                    '雪亭镇-雪亭镇街道-老农夫': 'jh 1;e;s;w',
                     '雪亭镇-淳风武馆教练场-武馆弟子': 'jh 1;e;n;e;e',
                     '洛阳-*银钩赌坊*-雅舍-玉娘': 'jh 2;#5 n;w;w;#3 n;e',
                     '洛阳-桃花别院-红娘': 'jh 2;#4 n;w;s',
@@ -3721,6 +3726,7 @@ window.setTimeout(function () {
                     '大旗门-蓝室': 'find_family_quest_road;find_clan_quest_road',
                     '大旗门-红室': 'find_family_quest_road;find_clan_quest_road',
                     '大旗门-绿室': 'find_family_quest_road;find_clan_quest_road',
+                    '大旗门-大堂': 'find_family_quest_road;find_clan_quest_road',
                     '大旗门-观月顶': 'find_family_quest_road;find_clan_quest_road',
                     '大旗门-谷内小径': 'find_family_quest_road;find_clan_quest_road',
                     '大理-半山竹林': 'find_family_quest_road;find_clan_quest_road',
@@ -3956,6 +3962,7 @@ window.setTimeout(function () {
                     '星宿海-百龙山': 'jh 28;n;#4 w;n',
                     '星宿海-储藏室': 'jh 28;n;w;n;n;se',
                     '星宿海-小路': 'jh 28;n;w;n;n',
+                    '星宿海-山间平地': 'jh 28;n;w;#3 n',
                     '茅山-山道': {
                         '野猪': 'jh 29;n'
                     },
