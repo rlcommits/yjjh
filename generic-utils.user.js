@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.29
+// @version      2.1.30
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -103,7 +103,9 @@ window.setTimeout(function () {
             DRAGON_REG_EXCLUDED_REMOTE: 'dragon.reg.excluded.remote',
             RECOVERY_SKILL: 'recovery.skill',
             RECOVERY_THRESHOLD: 'recovery.threshold',
-            DEBUG_MESSAGE_REJECTED: 'debug.message.rejected'
+            DEBUG_MESSAGE_REJECTED: 'debug.message.rejected',
+            FOREST_STARTPOINT_PATH_ALIAS: 'forest.startpoint.path.alias',
+            FOREST_STARTPOINT_PATH: 'forest.startpoint.path'
         }
     };
 
@@ -127,6 +129,7 @@ window.setTimeout(function () {
                 log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
                 log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
                 log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
+                log(`一键森林起点：${System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)}=${System.getVariant(System.keys.FOREST_STARTPOINT_PATH)}`);
                 log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
                 log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
                 log(`调试信息屏蔽：${System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED)}`);
@@ -1068,7 +1071,7 @@ window.setTimeout(function () {
             '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲',
             '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
             '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
-            '莲蓬',
+            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串',
             '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
             '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
             '废药渣', '废焦丹'
@@ -1172,11 +1175,14 @@ window.setTimeout(function () {
         }
 
         isCommandValid () {
-            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
             if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。')) return true;
-            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
 
-            debugging('不是一个合理的行动命令。');
+            if (!this._message.includes(TeamworkHelper.Constructure.getTeamLeadName())) return;
+            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
+            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
+            if (this._message.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`)) return true;
+
+            debugging('不是一个行动命令。');
         }
 
         action () {
@@ -1191,7 +1197,16 @@ window.setTimeout(function () {
                 TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
             } else if (this._message.includes('出发前往') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
                 matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。');
-                Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
+                TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
+                if (PathManager.getPathForSpecificEvent(matches[2])) {
+                    Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
+                } else {
+                    debugging('没有匹配到合适的出发处理规则。', matches);
+                }
+            } else if (this._message.includes('全体注意，目标') && this._message.includes('路径') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
+                matches = this._message.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`);
+                TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
+                Navigation.move(matches[3].replace(/%/g, ' '));
             }
         }
     };
@@ -1218,10 +1233,11 @@ window.setTimeout(function () {
 
         Role: {
             isTeamMember (playerName) {
-                return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`,${playerName},`));
+                return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`, ${playerName}, `));
             },
 
-            isTeamLead (playerName) {
+            isTeamLead (playerName = User.getName()) {
+
                 return System.globalObjectMap.get('msg_team').get('member1').split(',')[1] === playerName;
             }
         },
@@ -1288,7 +1304,7 @@ window.setTimeout(function () {
                 let action = message.includes('不是你死就是我活') ? '杀死' : '比试';
                 let matches = action === '杀死' ? message.match('你对著(.*?)喝道：.*?今日不是你死就是我活！') : message.match('你对著(.*?)说道：.*?，领教.*?高招！');
 
-                TeamworkHelper._teamChat(`全体注意，${action}${matches[1]}。 `);
+                TeamworkHelper.teamChat(`全体注意，${action}${matches[1]}。 `);
             }
         },
 
@@ -1317,7 +1333,7 @@ window.setTimeout(function () {
             },
 
             identifyTeamLeadName (teamLeadName) {
-                let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`,${teamLeadName},`));
+                let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`, ${teamLeadName}, `));
                 if (targetUser.length) {
                     let userInfo = targetUser[0]['value'].split(',');
 
@@ -1376,7 +1392,7 @@ window.setTimeout(function () {
             },
 
             async follow (message) {
-                if (System.globalObjectMap.get('msg_room').get('map_id') === 'shenshousenlin') return;
+                if (Objects.Room.getMapId() === 'shenshousenlin') return;
 
                 let matches = message.match('^【队伍】(.*?)：(.*?) $');
                 if (matches && TeamworkHelper.Role.isTeamLead(matches[1])) {
@@ -1387,16 +1403,20 @@ window.setTimeout(function () {
             },
 
             notifyTeamForMove (directionDiscription) {
-                TeamworkHelper._teamChat(`全体注意，往${directionDiscription}走一步。`);
+                TeamworkHelper.teamChat(`全体注意，往${directionDiscription}走一步。`);
             },
 
             notifyTeamForSpecialEvent (event) {
-                TeamworkHelper._teamChat(`全体注意，出发前往${event}。`);
+                TeamworkHelper.teamChat(`全体注意，出发前往${event}。`);
+            },
+
+            notifyTeamWithPath (alias, path) {
+                TeamworkHelper.teamChat(`全体注意，目标${alias}，路径${path}。`);
             }
         },
 
-        _teamChat (command) {
-            ButtonManager.click(`team chat ${command}`);
+        teamChat (command) {
+            ExecutionManager.execute(`clickButton('team chat ${command}', 0)`);
         }
     };
 
@@ -1633,7 +1653,7 @@ window.setTimeout(function () {
                             `${name}疑惑地看着你，道：你想干什么？`,
                             `${name}摇摇头，说道：你在这做什么？`,
                             '郭济说道：排云掌法威力奇大，招式飘忽，似乎当年创出此掌法之人出自嵩山，你替我找找看是否还有后人存在'
-                        ].join(`|`);
+                        ].join(`| `);
                         debugging('pattern=' + result);
                         return result;
                     }
@@ -1915,6 +1935,44 @@ window.setTimeout(function () {
 
         stopFishing () {
             ButtonManager.click('home');
+        }
+    };
+
+    var ForestHelper = {
+        setStartPointPath (path) {
+            System.setVariant(System.keys.FOREST_STARTPOINT_PATH, path);
+        },
+
+        getStartPointPath () {
+            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH)) {
+                System.setVariant(System.keys.FOREST_STARTPOINT_PATH, ForestHelper.getDefaultStartPointPath());
+            }
+
+            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH);
+        },
+
+        setStartPointPathAlias (alias) {
+            System.setVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS, alias);
+        },
+
+        getStartPointPathAlias () {
+            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)) {
+                System.setVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS, ForestHelper.getDefaultStartPointPathAlias());
+            }
+
+            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS);
+        },
+
+        getStartPointPathAliasAbbr () {
+            return ForestHelper.getStartPointPathAlias().substr(0, 3);
+        },
+
+        getDefaultStartPointPath () {
+            return PathManager.getPathForSpecificEvent(ForestHelper.getDefaultStartPointPathAlias());
+        },
+
+        getDefaultStartPointPathAlias () {
+            return '幽荧殿';
         }
     };
 
@@ -2687,6 +2745,10 @@ window.setTimeout(function () {
 
             getEventByName (eventName) {
                 return $('button').filter(function () { return !eventName || $(this).text() === eventName; }).attr('onclick');
+            },
+
+            getMapId () {
+                return System.globalObjectMap.get('msg_room').get('map_id');
             }
         },
 
@@ -3017,7 +3079,7 @@ window.setTimeout(function () {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
         },
 
-        _REG_DRAGON_APPERS: `^青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
+        _REG_DRAGON_APPERS: `^ 青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大) ? 区第(.*?)个(跨服) ? 青龙。`,
 
         isActive () {
             return DragonMonitor._active;
@@ -3167,7 +3229,7 @@ window.setTimeout(function () {
             MessageListener.enable();
 
             async function fire (dragon, action) {
-                if (Objects.Room.getNameV2() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0)`);
+                if (Objects.Room.getNameV2() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0) `);
 
                 let npcs = await DragonHelper.locateRoomInformation(dragon);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
@@ -3372,6 +3434,7 @@ window.setTimeout(function () {
                         if (msgTeam.get('member_num') === msgTeam.get('max_member_num')) return;
 
                         ButtonManager.click(this._messagePack.get('cmd1'), 0);
+                        ButtonManager.click('prev;prev');
                     }
 
                     break;
@@ -3466,7 +3529,7 @@ window.setTimeout(function () {
             }
 
             let answer = QuizzesHelper.getAnswer(question);
-            debugging(`question=${question}, answer=${answer}`);
+            debugging(`question = ${question}, answer = ${answer}`);
             if (answer) {
                 Panels.Quizzes.highlightAnswer(answer);
                 await ExecutionManager.wait(1000);
@@ -4090,7 +4153,9 @@ window.setTimeout(function () {
                 '青城孽龙': 'jh 15;n;nw;w;nw;n;event_1_14401179',
                 '峨嵋军阵钓鱼山脚': 'jh 8;ne;#3 e;n',
                 '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
-                '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w'
+                '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
+
+                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353'
             }
         }
     };
@@ -4128,7 +4193,7 @@ window.setTimeout(function () {
                 return PuzzleHelper._workqueue.length === 5;
 
                 function hasQuanlifiedTask (mapName) {
-                    debugging(`${PuzzleHelper._workqueue.length}/${PuzzleHelper._workqueue}`);
+                    debugging(`${PuzzleHelper._workqueue.length} / ${PuzzleHelper._workqueue}`);
                     return PuzzleHelper._workqueue.length && PuzzleHelper._workqueue.some(t => t.match(mapName));
                 }
 
@@ -5333,7 +5398,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: KnightManager.getKeyKnight() ? `撩${KnightManager.getKeyKnight().substr(0, 2)}` : '撩奇侠',
-            title: '平民版撩奇侠（当前奇侠目标未设定）增加好感度\n\n免小号：放茅山道术招小弟->逃跑->和奇侠群殴小弟',
+            title: '平民版撩奇侠增加好感度\n\n免小号：放茅山道术招小弟->逃跑->和奇侠群殴小弟',
             id: 'id-please-knight',
             width: '60px',
             marginRight: '1px',
@@ -5586,14 +5651,47 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: ForestHelper.getStartPointPathAliasAbbr(),
+            title: `一键从任意处走到森林入口${ForestHelper.getStartPointPathAlias()}...`,
+            width: '60px',
+            marginRight: '1px',
+            id: 'id-forest-startpoint',
+
+            async eventOnClick () {
+                let warning = TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead(User.getName()) ? '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。' : '当前没有组队或者不是队长，同组队员不会同步行动。';
+                if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
+                    TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
+                    Navigation.move(ForestHelper.getStartPointPath());
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置森林入口路径...',
+            width: '10px',
+            id: 'id-forest-startpoint-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式指定森林入口别名（可任意取名，仅作显示代号方便记忆）及实际路径（语法需严格遵守要求）：\n\n例子：幽荧殿=' + ForestHelper.getStartPointPath(), ForestHelper.getStartPointPathAlias() + '=' + ForestHelper.getStartPointPath());
+                if (!answer) return;
+
+                let matches = answer.match(/(.*?)=(.*)/);
+                if (matches && matches[1] && matches[2]) {
+                    ForestHelper.setStartPointPathAlias(matches[1]);
+                    ForestHelper.setStartPointPath(matches[2]);
+                    $('#id-forest-startpoint').text(ForestHelper.getStartPointPathAliasAbbr());
+                } else {
+                    window.alert('设置格式不正确，请参照例子重新设置');
+                }
+            }
+        }, {
             label: '一键森林',
             title: '一键按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc...\n\n注意：\n未经测试版',
             id: 'id-forest-killer',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (Objects.Room.getName() !== '幽荧殿') {
-                        window.alert('目前本功能只支持从森林起点幽荧殿开始。');
+                    if (Objects.Room.getMapId() !== 'shenshousenlin') {
+                        window.alert('目前本功能只支持神兽森林，注意：请从森林起点处开始。');
                         ButtonManager.resetButtonById(this.id);
                         return;
                     }
@@ -6403,7 +6501,7 @@ window.setTimeout(function () {
         }
 
         if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
-            debugging(`${messagePack.get('type')}|${messagePack.get('subtype')}|${messagePack.get('msg')}`, messagePack.elements);
+            debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
         }
     };
 }, 1000);
