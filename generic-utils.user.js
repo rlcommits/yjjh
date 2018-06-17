@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.30
+// @version      2.1.31
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -113,7 +113,7 @@ window.setTimeout(function () {
         _areaRange: '',
 
         async initialize () {
-            await ButtonManager.click('skills;team;friend;score;#4 prev');
+            await ButtonManager.click('skills;team;friend;score;items;#5 prev');
 
             User._areaRange = analyseAreaRange(User.getArea());
 
@@ -2624,6 +2624,10 @@ window.setTimeout(function () {
                     let item = new Item(System.replaceControlCharBlank(values[1]), values[0], parseInt(values[2]));
                     return item;
                 });
+            },
+
+            hasItem (name = '') {
+                return System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(`,${name},`)).length;
             }
         }
     };
@@ -3373,6 +3377,7 @@ window.setTimeout(function () {
         isWorking () {
             return DragonMonitor.isActive() ||
                 TeamworkHelper.isTeamworkModeOn() ||
+                DragonMonitor.isActive() ||
                 TeamworkHelper.isAnyTeamJoinRequestAccpted() ||
                 GenericTaskManager.isAutomationActive() ||
                 TeamworkHelper.Combat.isFollowingBattleActive() ||
@@ -5262,8 +5267,12 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (Objects.Room.getName() !== '天山山脚') {
-                        window.alert('请先自行走到天山山脚。');
+                    let warning = '';
+                    if (!Panels.Backpack.hasItem('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
+                    if (Objects.Room.getName() !== '天山山脚') warning = '请先自行走到天山山脚。';
+
+                    if (warning) {
+                        window.alert(warning);
                         ButtonManager.resetButtonById(this.id);
                         return;
                     }
