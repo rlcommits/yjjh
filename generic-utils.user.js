@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.31
+// @version      2.1.32
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -3083,7 +3083,7 @@ window.setTimeout(function () {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
         },
 
-        _REG_DRAGON_APPERS: `^ 青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大) ? 区第(.*?)个(跨服) ? 青龙。`,
+        _REG_DRAGON_APPERS: `^青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
         isActive () {
             return DragonMonitor._active;
@@ -3377,7 +3377,6 @@ window.setTimeout(function () {
         isWorking () {
             return DragonMonitor.isActive() ||
                 TeamworkHelper.isTeamworkModeOn() ||
-                DragonMonitor.isActive() ||
                 TeamworkHelper.isAnyTeamJoinRequestAccpted() ||
                 GenericTaskManager.isAutomationActive() ||
                 TeamworkHelper.Combat.isFollowingBattleActive() ||
