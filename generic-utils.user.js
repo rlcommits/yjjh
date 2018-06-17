@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.32
+// @version      2.1.33
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -105,7 +105,8 @@ window.setTimeout(function () {
             RECOVERY_THRESHOLD: 'recovery.threshold',
             DEBUG_MESSAGE_REJECTED: 'debug.message.rejected',
             FOREST_STARTPOINT_PATH_ALIAS: 'forest.startpoint.path.alias',
-            FOREST_STARTPOINT_PATH: 'forest.startpoint.path'
+            FOREST_STARTPOINT_PATH: 'forest.startpoint.path',
+            FOREST_TRAVERSAL_PATH: 'forest.traversal.path'
         }
     };
 
@@ -130,6 +131,7 @@ window.setTimeout(function () {
                 log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
                 log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
                 log(`一键森林起点：${System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)}=${System.getVariant(System.keys.FOREST_STARTPOINT_PATH)}`);
+                log(`一键森林扫荡路径：${System.getVariant(System.keys.FOREST_TRAVERSAL_PATH)}`);
                 log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
                 log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
                 log(`调试信息屏蔽：${System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED)}`);
@@ -1068,10 +1070,10 @@ window.setTimeout(function () {
             '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
             '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
             '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
-            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲',
+            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫',
             '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
             '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
-            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串',
+            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
             '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
             '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
             '废药渣', '废焦丹'
@@ -1237,7 +1239,6 @@ window.setTimeout(function () {
             },
 
             isTeamLead (playerName = User.getName()) {
-
                 return System.globalObjectMap.get('msg_team').get('member1').split(',')[1] === playerName;
             }
         },
@@ -1939,6 +1940,22 @@ window.setTimeout(function () {
     };
 
     var ForestHelper = {
+        getTraversalPath () {
+            if (!System.getVariant(System.keys.FOREST_TRAVERSAL_PATH)) {
+                System.setVariant(System.keys.FOREST_TRAVERSAL_PATH, ForestHelper.getDefaultTraversalPath());
+            }
+
+            return System.getVariant(System.keys.FOREST_TRAVERSAL_PATH);
+        },
+
+        setTraversalPath (path) {
+            System.setVariant(System.keys.FOREST_TRAVERSAL_PATH, path);
+        },
+
+        getDefaultTraversalPath () {
+            return '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;#4 s;#3 w;#6 e';
+        },
+
         setStartPointPath (path) {
             System.setVariant(System.keys.FOREST_STARTPOINT_PATH, path);
         },
@@ -4159,7 +4176,7 @@ window.setTimeout(function () {
                 '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
                 '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
 
-                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353'
+                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353;#4 s;#3 w'
             }
         }
     };
@@ -5692,9 +5709,11 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '一键森林',
-            title: '一键按既定路径（4层->3层->2层->1层自动寻找路径并叫杀 npc...\n\n注意：\n未经测试版',
+            label: '扫森林',
+            title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...',
             id: 'id-forest-killer',
+            width: '60px',
+            marginRight: '1px',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -5704,17 +5723,32 @@ window.setTimeout(function () {
                         return;
                     }
 
-                    if (window.confirm('确定开始按既定路径（4层->3层->2层->1层 自动寻找路径并叫杀 npc?')) {
-                        await MapCleanerV2.gotoStartPoint('#4 s;#3 w');
+                    if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
+                        MapCleanerV2.initialize(ForestHelper.getTraversalPath().split(';').extract(), 5000);
 
-                        let travelsalPath = '#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;n;#3 w;#6 e;#3 w;#4 n'.split(';').extract();
-                        MapCleanerV2.initialize(travelsalPath, 5000);
                         await MapCleanerV2.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
                     MapCleanerV2.stop();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置森林入口路径...',
+            width: '10px',
+            id: 'id-forest-killer-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式指定森林里扫荡的起点和开打的实际路径（语法需严格遵守要求）：\n\n例子：' + ForestHelper.getTraversalPath(), ForestHelper.getTraversalPath());
+                if (!answer) return;
+
+                let matches = answer.match(/[^a-z0-9#; ]/);
+                if (!matches) {
+                    ForestHelper.setTraversalPath(answer);
+                } else {
+                    window.alert('设置格式不正确，请参照例子重新设置');
                 }
             }
         }]
