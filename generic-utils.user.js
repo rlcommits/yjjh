@@ -106,7 +106,8 @@ window.setTimeout(function () {
             DEBUG_MESSAGE_REJECTED: 'debug.message.rejected',
             FOREST_STARTPOINT_PATH_ALIAS: 'forest.startpoint.path.alias',
             FOREST_STARTPOINT_PATH: 'forest.startpoint.path',
-            FOREST_TRAVERSAL_PATH: 'forest.traversal.path'
+            FOREST_TRAVERSAL_PATH: 'forest.traversal.path',
+            DAILY_ONEOFF_TASK_INDEX: 'daily.oneoff.task.index'
         }
     };
 
@@ -129,6 +130,7 @@ window.setTimeout(function () {
                 log(`自动出招设置：${System.getVariant(System.keys.ATTACK_SKILLS)} - 预留 ${System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)} 气`);
                 log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
                 log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
+                log(`默认每日一次任务序号：${System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX)}`);
                 log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
                 log(`一键森林起点：${System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)}=${System.getVariant(System.keys.FOREST_STARTPOINT_PATH)}`);
                 log(`一键森林扫荡路径：${System.getVariant(System.keys.FOREST_TRAVERSAL_PATH)}`);
@@ -803,18 +805,36 @@ window.setTimeout(function () {
         },
 
         getTaskListString (todoOnly = false, flagStatus = false) {
-            let tasks = todoOnly ? DailyOneOffTaskHelper._tasksDefined.filter(v => v['todo']) : DailyOneOffTaskHelper._tasksDefined;
+            let todoTaskIndexRanges = DailyOneOffTaskHelper.getDefaultTaskIndexRange().split('-');
+            let min = parseInt(todoTaskIndexRanges[0]);
+            let max = parseInt(todoTaskIndexRanges[1]);
+            let tasks = todoOnly ? DailyOneOffTaskHelper._tasksDefined.filter(v => v['index'] >= min && v['index'] <= max) : DailyOneOffTaskHelper._tasksDefined;
 
             return tasks.map(v => v['index'] + '. ' + v['item'] + ((flagStatus & v['completed']) ? ' (已执行) ' : '')).join('\n');
+        },
+
+        getDefaultTaskIndexRange () {
+            if (!System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX)) {
+                System.setVariant(System.keys.DAILY_ONEOFF_TASK_INDEX, '1-9');
+            }
+
+            return System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX);
+        },
+
+        setDefaultTask (taskIndex) {
+            System.setVariant(System.keys.DAILY_ONEOFF_TASK_INDEX, taskIndex);
         },
 
         async fire () {
             DailyOneOffTaskHelper._stop = false;
             $('#id-escape').click();
 
-            for (let i = 0; i < DailyOneOffTaskHelper._tasksDefined.length; i++) {
+            let todoTaskIndexRanges = DailyOneOffTaskHelper.getDefaultTaskIndexRange().split('-');
+            let min = parseInt(todoTaskIndexRanges[0]);
+            let max = parseInt(todoTaskIndexRanges[1]);
+
+            for (let i = min - 1; i < max; i++) {
                 if (DailyOneOffTaskHelper._stop) break;
-                if (!DailyOneOffTaskHelper._tasksDefined[i]['todo']) continue;
 
                 await DailyOneOffTaskHelper._tasksDefined[i]['action']();
                 DailyOneOffTaskHelper._tasksDefined[i]['completed'] = true;
@@ -5209,14 +5229,14 @@ window.setTimeout(function () {
 
         buttons: [{
             label: '基本',
-            title: '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true),
+            title: '当前设定为：\n\n' + DailyOneOffTaskHelper.getDefaultTaskIndexRange(),
             width: '60px',
             marginRight: '1px',
             id: 'id-oneoff-tasks',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (window.confirm('确定开始以下项目？\n\n' + DailyOneOffTaskHelper.getTaskListString(true))) {
+                    if (window.confirm('确定开始以下项目？\n\n' + DailyOneOffTaskHelper.getTaskListString(true, false))) {
                         await DailyOneOffTaskHelper.fire();
                     }
                 }
@@ -5231,15 +5251,14 @@ window.setTimeout(function () {
             id: 'id-oneoff-tasks-setting',
 
             async eventOnClick () {
-                let todoTasks = DailyOneOffTaskHelper.getTaskDefined().filter(v => !v['completed']);
-                let defaultChoice = !todoTasks.length ? '1-9' : ((todoTasks.length === 1) ? '1' : todoTasks[0]['index'] + '-' + todoTasks[todoTasks.length - 1]['index']);
-                let choice = window.prompt('请指定要执行任务的序号（1-4 可表示一至四项）。\n\n' + DailyOneOffTaskHelper.getTaskListString(false, true), defaultChoice);
+                let choice = window.prompt('请指定要执行任务的序号（1-4 可表示一至四项）。\n\n' + DailyOneOffTaskHelper.getTaskListString(false, true), DailyOneOffTaskHelper.getDefaultTaskIndexRange());
                 if (!choice) return;
 
                 if (!DailyOneOffTaskHelper.initialize(choice)) {
                     window.alert('请按格式输入任务序号或序号范围。');
                 } else {
-                    $('#id-oneoff-tasks').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true));
+                    DailyOneOffTaskHelper.setDefaultTask(choice);
+                    $('#id-oneoff-tasks').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getDefaultTaskIndexRange());
                 }
             }
         }, {
