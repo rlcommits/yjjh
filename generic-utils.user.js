@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.33
+// @version      2.1.34
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -1234,7 +1234,7 @@ window.setTimeout(function () {
         },
 
         Role: {
-            isTeamMember (playerName) {
+            isTeamMember (playerName = User.getName()) {
                 return System.globalObjectMap.get('msg_team').elements.filter(v => v['key'].match('member[1-4]')).some(v => v['value'].includes(`, ${playerName}, `));
             },
 
@@ -1961,11 +1961,16 @@ window.setTimeout(function () {
         },
 
         getStartPointPath () {
-            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH)) {
+            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH) || isOldPath(System.getVariant(System.keys.FOREST_STARTPOINT_PATH))) {
                 System.setVariant(System.keys.FOREST_STARTPOINT_PATH, ForestHelper.getDefaultStartPointPath());
             }
 
             return System.getVariant(System.keys.FOREST_STARTPOINT_PATH);
+
+            function isOldPath (path) {
+                return path === 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353;#4 s;#3 w' ||
+                    path === 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353';
+            }
         },
 
         setStartPointPathAlias (alias) {
@@ -2044,6 +2049,8 @@ window.setTimeout(function () {
                 return false;
             } else {
                 await Objects.Npc.action(this._npc, this._action);
+                log('双方对战人员：', null, Panels.Combat.getCombatInfo);
+
                 await ExecutionManager.wait(1000);
 
                 if (!CombatStatus.inProgress()) {
@@ -3372,7 +3379,7 @@ window.setTimeout(function () {
         },
 
         async killDirectly (npc) {
-            let combat = new Combat();
+            let combat = new Combat(200, true);
             combat.initialize(npc, '杀死');
             await combat.fire();
         }
@@ -4176,7 +4183,7 @@ window.setTimeout(function () {
                 '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
                 '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
 
-                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353;#4 s;#3 w'
+                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1000;event_1_40313353;#4 s;#3 w'
             }
         }
     };
@@ -4400,9 +4407,12 @@ window.setTimeout(function () {
             let steps = path.split(';').extract();
 
             for (let i = 0; i < steps.length; i++) {
-                let command = steps[i][0] !== '~' ? "clickButton('" + steps[i] + "')" : Objects.Room.getEventByName(steps[i].substr(1));
-
-                await ExecutionManager.asyncExecute(command);
+                if (steps[i].includes('#wait ')) {
+                    await ExecutionManager.wait(parseInt(steps[i].split(' ')[1]));
+                } else {
+                    let command = steps[i][0] !== '~' ? "clickButton('" + steps[i] + "')" : Objects.Room.getEventByName(steps[i].substr(1));
+                    await ExecutionManager.asyncExecute(command);
+                }
             }
         }
     };
@@ -4427,7 +4437,7 @@ window.setTimeout(function () {
         let result = [];
 
         for (let i = 0; i < this.length; i++) {
-            if (this[i].charAt(0) === '#') {
+            if (this[i].charAt(0) === '#' && this[i].charAt(1) !== 'w') {
                 let r = this[i].match('#(.*?) (.*)');
                 let repeatTimes = parseInt(r[1]);
                 for (let j = 0; j < repeatTimes; j++) {
@@ -5677,21 +5687,39 @@ window.setTimeout(function () {
         }, {
         }, {
             label: ForestHelper.getStartPointPathAliasAbbr(),
-            title: `一键从任意处走到森林入口${ForestHelper.getStartPointPathAlias()}...`,
+            title: `一键从任意处走到森林入口${ForestHelper.getStartPointPathAlias()}...\n\n注意：\n队长专属功能，队员可以不用设置。`,
             width: '60px',
             marginRight: '1px',
             id: 'id-forest-startpoint',
 
             async eventOnClick () {
-                let warning = TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead(User.getName()) ? '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。' : '当前没有组队或者不是队长，同组队员不会同步行动。';
+                if (Objects.Room.getMapId() === 'shenshousenlin') {
+                    window.alert('当前已经在神兽森林里了，不要重复点击。');
+                    return;
+                }
+
+                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
+                let notifyTeamRequired = false;
+                if (TeamworkHelper.isTeamworkModeOn()) {
+                    if (TeamworkHelper.Role.isTeamLead()) {
+                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
+                        notifyTeamRequired = true;
+                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
+                        return;
+                    }
+                }
+
                 if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
-                    TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
+                    if (notifyTeamRequired) {
+                        TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
+                    }
+
                     Navigation.move(ForestHelper.getStartPointPath());
                 }
             }
         }, {
             label: '.',
-            title: '设置森林入口路径...',
+            title: '设置到起点的路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
             width: '10px',
             id: 'id-forest-startpoint-setting',
 
@@ -5709,8 +5737,8 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '扫森林',
-            title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...',
+            label: '自动打',
+            title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...\n\n注意：\n队长专属功能，队员可以不用设置。',
             id: 'id-forest-killer',
             width: '60px',
             marginRight: '1px',
@@ -5721,6 +5749,15 @@ window.setTimeout(function () {
                         window.alert('目前本功能只支持神兽森林，注意：请从森林起点处开始。');
                         ButtonManager.resetButtonById(this.id);
                         return;
+                    }
+
+                    if (TeamworkHelper.isTeamworkModeOn() && !TeamworkHelper.Role.isTeamLead()) {
+                        if (!window.confirm('当前不是队长，确定要自己杀？')) {
+                            return;
+                        } else {
+                            ButtonManager.resetButtonById(this.id);
+                            return;
+                        }
                     }
 
                     if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
@@ -5736,7 +5773,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置森林入口路径...',
+            title: '设置森林入口路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
             width: '10px',
             id: 'id-forest-killer-setting',
 
