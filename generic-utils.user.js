@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.35
+// @version      2.1.36
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -3392,16 +3392,21 @@ window.setTimeout(function () {
         async observe (npc) {
             await Objects.Npc.action(npc, '观战');
 
+            log('开始观战时在场人员：', null, Panels.Combat.getCombatInfo);
             for (let i = 0; i < 15; i++) {
                 debugging('战场信息：', null, Panels.Combat.getCombatInfo);
                 await ExecutionManager.wait(500);
             }
+
+            log('结束观战时在场人员：', null, Panels.Combat.getCombatInfo);
         },
 
         async killDirectly (npc) {
-            let combat = new Combat(200, true);
+            let combat = new Combat();
             combat.initialize(npc, '杀死');
             await combat.fire();
+
+            log('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
         }
     };
 
@@ -4437,19 +4442,21 @@ window.setTimeout(function () {
         }
     };
 
-    function log (message, object) {
-        object ? console.log(message, object) : console.log(message);
+    function log (message, obj, func = null) {
+        if (func || obj) {
+            func ? console.log(message, obj, func()) : console.log(message, obj);
+        } else {
+            console.log(message);
+        }
     }
 
     function debugging (message = '', obj, func = null) {
         if (!System.debugMode) return;
 
-        if (func) {
-            console.debug('[Debug]', message, func());
-        } else if (obj) {
-            console.debug(`[Debug]${message}`, obj);
+        if (func || obj) {
+            func ? console.debug('[Debug]', message, obj, func()) : console.debug('[Debug]', message, obj);
         } else {
-            console.debug(`[Debug]`, message);
+            console.debug('[Debug]', message);
         }
     }
 
