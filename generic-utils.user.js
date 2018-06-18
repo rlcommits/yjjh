@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.34
+// @version      2.1.35
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -5229,7 +5229,7 @@ window.setTimeout(function () {
 
         buttons: [{
             label: '基本',
-            title: '当前设定为：\n\n' + DailyOneOffTaskHelper.getDefaultTaskIndexRange(),
+            title: '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true),
             width: '60px',
             marginRight: '1px',
             id: 'id-oneoff-tasks',
@@ -5258,7 +5258,7 @@ window.setTimeout(function () {
                     window.alert('请按格式输入任务序号或序号范围。');
                 } else {
                     DailyOneOffTaskHelper.setDefaultTask(choice);
-                    $('#id-oneoff-tasks').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getDefaultTaskIndexRange());
+                    $('#id-oneoff-tasks').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true));
                 }
             }
         }, {
