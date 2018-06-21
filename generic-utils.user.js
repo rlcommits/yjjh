@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.36
+// @version      2.1.37
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -53,7 +53,9 @@ window.setTimeout(function () {
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
         debugMode: false,
+
         _uid: '',
+        _automatedReconnect: false,
 
         replaceControlCharBlank (valueWithColor) {
             return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
@@ -107,7 +109,51 @@ window.setTimeout(function () {
             FOREST_STARTPOINT_PATH_ALIAS: 'forest.startpoint.path.alias',
             FOREST_STARTPOINT_PATH: 'forest.startpoint.path',
             FOREST_TRAVERSAL_PATH: 'forest.traversal.path',
-            DAILY_ONEOFF_TASK_INDEX: 'daily.oneoff.task.index'
+            DAILY_ONEOFF_TASK_INDEX: 'daily.oneoff.task.index',
+            LAST_ACTIVE_BUTTON_IDS: 'active.button.ids',
+            INTERVAL_AUTO_RECONNECT: 'interval.auto.reconnect'
+        },
+
+        setAutomatedReconnect (automatedReconnect) {
+            System._automatedReconnect = automatedReconnect;
+        },
+
+        isAutomatedReconnectRequired () {
+            return System._automatedReconnect;
+        },
+
+        async refreshPageIfConnectionDropped () {
+            if (!window.unsafeWindow.sock) {
+                System.saveLastButtonStatus();
+                await ExecutionManager.wait(2000);
+
+                window.unsafeWindow.location.reload();
+            }
+        },
+
+        loadLastButtonStatus () {
+            let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
+            log('读取上次激活的按钮...', ids);
+
+            log('is array: ', Array.isArray(ids));
+            if (ids && Array.isArray(ids)) {
+                for (let i = 0; i < ids.length; i++) {
+                    log(`ids[${i}]=` + ids[i]);
+                    ButtonManager.pressDown(ids[i]);
+                }
+            }
+        },
+
+        saveLastButtonStatus () {
+            let ids = [];
+            $('button').filter(function () {
+                return $(this).text().includes('x');
+            }).each(function () {
+                ids.push($(this).attr('id'));
+            });
+
+            log('保存当前激活的按钮', ids);
+            System.setVariant(System.keys.LAST_ACTIVE_BUTTON_IDS, ids);
         }
     };
 
@@ -415,7 +461,14 @@ window.setTimeout(function () {
         }
 
         getId () {
-            return this._id ? this._id : Objects.Npc.getIdByName(this._name);
+            if (this._id) {
+                return this._id;
+            } else {
+                let ids = Objects.Room.getNpcIdsByName(this._name);
+                if (ids && ids.length > 0) {
+                    return ids[0];
+                }
+            }
         }
 
         getName () {
@@ -457,225 +510,273 @@ window.setTimeout(function () {
         toString () {
             return this._name + '/' + this._id;
         }
-    }
+    };
 
-    class Task {
-        identifyPath (room, specificTarget) {
-            this._room = room;
+    var InterceptorFactory = {
+        _interceptors: [],
 
-            if (PathManager.getPathForFightOrGet(this._room, specificTarget)) {
-                this._path = PathManager.getPathForFightOrGet(this._room, specificTarget);
-                this._type = GenericTaskManager.Types.FIGHT_OR_GET;
-            } else if (PathManager.getPathForPurchase(this._room)) {
-                this._path = PathManager.getPathForPurchase(this._room);
-                this._type = GenericTaskManager.Types.PURCHASE;
-            } else if (PathManager.getPathForItemsWithNpcBody(this._room)) {
-                this._path = PathManager.getPathForItemsWithNpcBody(this._room);
-                this._type = GenericTaskManager.Types.BODY;
+        register (interceptor) {
+            this._interceptors.push(interceptor);
+        },
+
+        unregister (alias) {
+            this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)));
+        },
+
+        getInterceptors () {
+            return this._interceptors;
+        }
+    };
+
+    class Interceptor {
+        constructor (alias) {
+            this._alias = alias;
+        }
+
+        getAlias () {
+            return this._alias;
+        }
+
+        initialize (criterial, behavior) {
+            this._criterial = criterial;
+            this._behavior = behavior;
+        }
+
+        handle (message) {
+            debugging(message);
+
+            if (this._criterial(message)) {
+                this._behavior(message);
+            }
+        }
+    };
+
+    class TaskV2 {
+        constructor (text) {
+            this._text = text;
+
+            this._initialize();
+        }
+
+        async _initialize () {
+            let waitingMicroSeconds = 0;
+            if (CombatStatus.inProgress()) {
+                waitingMicroSeconds = 10000;
+            } else if (this._text.includes('帮派使者：现在并没有任务，好好练功吧！')) {
+                waitingMicroSeconds = 1000;
+            }
+
+            if (waitingMicroSeconds) {
+                await ExecutionManager.wait(waitingMicroSeconds);
+                this._initialize();
+            }
+
+            debugging('分析任务信息...');
+            let matches = this._text.match(/任务所在地方好像是：(.*)/);
+            if (!matches) {
+                debugging('任务地点信息缺失', this._text);
+                return;
+            }
+
+            GenericTaskManager.generateAdditionalTask();
+
+            this._place = matches[1];
+            debugging('任务地点', this._place);
+
+            matches = this._text.match('你现在的任务是(杀|战胜)href;0;(.*?)(.*?)0。') || this._text.match('给我在.*?内(杀|战胜)href;0;(.*?)(.*?)0。');
+            if (matches) {
+                this._action = matches[1] === '杀' ? '杀死' : '比试';
+                this._shortcut = matches[2];
+                this._npc = new Npc(matches[3]);
+                this._path = PathManager.getPathForFightOrGet(this._place);
+
+                debugging('战斗任务关键信息', this._action + '/' + this._npc + '/' + this._path);
             } else {
-                debugging('failed to identify task type');
+                matches = this._text.match('给我在.*?秒内寻找href;0;(.*?)(.*?)0。') || this._text.match('你现在的任务是寻找href;0;(.*?)(.*?)0。');
+                if (matches) {
+                    this._shortcut = matches[1];
+                    this._item = new Item(matches[2]);
+                    this._path = PathManager.getPathForFightOrGet(this._place) ||
+                        PathManager.getPathForPurchase(this._place) ||
+                        PathManager.getPathForItemsFromNpcBody(this._place);
+
+                    debugging('其他任务关键信息', this._item.toString() + '/' + this._path);
+                }
             }
         }
 
-        getType () {
-            return this._type;
-        }
+        async resolve () {
+            debugging('处理任务...');
+            if (this._item && Panels.Backpack.getItemQuantityByName(this._item.getName())) {
+                let link = await Panels.Family.getActionLink('交任务');
+                await ExecutionManager.asyncExecute(link);
+                return;
+            }
 
-        getRoom () {
-            return this._room;
-        }
+            await Navigation.move(this._path && this._path !== 'find_family_quest_road;find_clan_quest_road' ? this._path : this._shortcut);
 
-        getPath () {
-            return this._path;
-        }
+            if (this._action) {
+                let combat = new Combat(200, false, true);
+                combat.initialize(this._npc, this._action);
+                await combat.fire();
+            } else if (this._item.getId()) {
+                await Objects.Item.action(this._item, '捡起');
+            } else {
+                let npc = parseNpcFromPlace(this._place);
+                if (npc.getId()) {
+                    debugging('定位到 npc', npc);
 
-        setNpc (npc) {
-            this._npc = npc;
-        }
+                    if (PathManager.getPathForPurchase(this._place)) {
+                        await buyFromNpc(npc, this._item.getName());
+                    } else if (PathManager.getPathForItemsFromNpcBody(this._place)) {
+                        await killAndSearch(npc);
+                    } else {
+                        debugging('npc 在场但是没有找到所需物品', this._item);
+                    }
+                } else {
+                    debugging('npc 不在场，没有找到所需物品', npc);
+                }
+            }
 
-        getNpc () {
-            return this._npc;
-        }
+            async function buyFromNpc (npc, itemName) {
+                debugging(`准备向${npc.getName()}购买${itemName}`);
+                await Objects.Npc.action(npc, '购买');
+                await ExecutionManager.wait(200);
+                await $('span.out2:contains(' + itemName + ')').click();
+                await ExecutionManager.wait(200);
+                await $('.cmd_click2:contains(购买)').click();
+                await ExecutionManager.wait(500);
+            }
 
-        setAction (action) {
-            this._action = action;
-        }
+            async function killAndSearch (npc) {
+                let combat = new Combat(200, false, true);
+                combat.initialize(npc, '杀死');
 
-        getAction () {
-            return this._action;
-        }
+                await combat.fire();
+                await ButtonManager.click('prev_combat');
+                await ExecutionManager.wait(500);
 
-        setItem (item) {
-            this._item = item;
-        }
+                let search = new BodySearch();
+                await search.identifyCandidates();
+                await search.fire();
+            }
 
-        getItem () {
-            return this._item;
+            function parseNpcFromPlace (place) {
+                let info = place.split('-');
+                return new Npc(info[info.length - 1]);
+            }
         }
-
-        toString () {
-            let result = this._type + '/' + this._room + '/' + this._action + '/';
-            if (this._npc) result += this._npc.getName();
-            if (this._item) result += this._item.getName();
-
-            return result;
-        }
-    }
+    };
 
     var GenericTaskManager = {
-        _tasksNotSupported: [],
-        _automationActive: false,
-
-        Types: {
-            FIGHT_OR_GET: 1,
-            PURCHASE: 2,
-            BODY: 3
-        },
-
-        startAutomation () {
-            log('自动帮派/师门任务开启...');
-            GenericTaskManager._automationActive = true;
-        },
-
-        stopAutomation () {
-            log('自动帮派/师门任务停止...');
-            GenericTaskManager._automationActive = false;
-        },
-
-        isAutomationActive () {
-            return GenericTaskManager._automationActive;
-        },
-
-        isTaskDone (messageWithColor) {
-            if (!messageWithColor) return false;
-
-            return messageWithColor.includes('恭喜你完成');
-        },
-
-        async triggerNext (messageWithColor) {
-            let matches = messageWithColor.match('恭喜你完成(.*?)任务');
-            if (!matches) return;
-
-            debugging('检测到任务完成，自动触发下一个任务...');
-            await ExecutionManager.wait(1500);
-            if (matches[1] === '帮派') {
-                $('#id-task-clan').click();
-            } else {
-                $('#id-task-master').click();
-            }
-        },
-
-        async handleTask () {
-            let task = GenericTaskManager.identifyTask();
-            if (task.getPath()) {
-                await Navigation.move(task.getPath());
-            } else {
-                GenericTaskManager._tasksNotSupported.push(task.toString());
-                log('当前版本暂不支持此任务：' + task.toString());
-            }
-
-            await ExecutionManager.wait(500);
-
-            switch (task.getType()) {
-                case GenericTaskManager.Types.FIGHT_OR_GET:
-                    if (task.getAction() === '捡起') {
-                        return Objects.Item.action(task.getItem(), task.getAction());
-                    } else {
-                        let combat = new Combat();
-                        combat.initialize(task.getNpc(), task.getAction());
-
-                        return combat.fire();
-                    }
-                case GenericTaskManager.Types.PURCHASE:
-                    await Objects.Npc.action(task.getNpc(), '购买');
-                    await ExecutionManager.wait(500);
-
-                    await $('span.out2:contains(' + task.getItem().getName() + ')').click();
-
-                    await ExecutionManager.wait(500);
-
-                    await $('.cmd_click2:contains(购买)').click();
-                    await ExecutionManager.wait(2000);
-
-                    return true;
-                case GenericTaskManager.Types.BODY:
-                    let combat = new Combat();
-                    combat.initialize(task.getNpc(), '杀死');
-
-                    await combat.fire();
-                    await ButtonManager.click('prev_combat');
-                    await ExecutionManager.wait(500);
-
-                    let search = new BodySearch();
-                    await search.identifyCandidates();
-                    return search.fire();
-                default:
-                    return false;
-            }
-        },
-
-        identifyTask () {
-            let message = Panels.Notices.filterMessageObjectsByKeyword('任务所在地方好像是').last().text();
-            debugging('message=' + message);
-            let taskDescription = message.match('任务所在地方好像是：(.*?)你') || message.match('任务所在地方好像是：(.*?)');
-            let task = new Task();
-
-            generateAdditionalTask();
-
-            let matches = message.match('你现在的任务是(杀|战胜)(.*?)。') || message.match('给我在.*?内(杀|战胜)(.*?)。');
-            if (matches) {
-                task.identifyPath(taskDescription[1], matches[2]);
-
-                task.setAction(matches[1] === '杀' ? '杀死' : '比试');
-                task.setNpc(new Npc(matches[2]));
-            } else {
-                let findings = message.match('给我在.*?内寻找(.*?)。') || message.match('你现在的任务是寻找(.*?)。');
-                if (findings) {
-                    task.identifyPath(taskDescription[1], findings[1]);
-                    task.setItem(new Item(findings[1]));
-
-                    if (PathManager.getPathForFightOrGet(task.getRoom(), task.getItem().getName())) {
-                        task.setAction('捡起');
-                    } else if (PathManager.getPathForItemsWithNpcBody(task.getRoom()) || PathManager.getPathForPurchase(task.getRoom())) {
-                        let place = task.getRoom().split('-');
-                        task.setNpc(new Npc(place[place.length - 1]));
-                        debugging('identify npc name=' + place[place.length - 1]);
-
-                        if (PathManager.getPathForItemsWithNpcBody(task.getRoom())) {
-                            task.setAction('杀死');
-                        } else if (PathManager.getPathForPurchase(task.getRoom())) {
-                            task.setAction('购买');
-                        }
-                    } else {
-                        debugging('failed to load path for task room: ' + task.getRoom());
-                    }
-
-                    debugging('identify type=' + task.getAction());
+        generateAdditionalTask () {
+            let obj = Panels.Notices.filterMessageObjectsByKeyword('你今天已完成(.*?)个任务').last();
+            if (obj.text()) {
+                let matches = obj.text().match('你今天已完成(.*?)个任务');
+                switch (matches[1]) {
+                    case '24/25':
+                        ButtonManager.click('vip finish_family');
+                        break;
+                    case '19/20':
+                        ButtonManager.click('vip finish_clan');
+                        break;
+                    case '39/40':
+                        ButtonManager.click('vip finish_clan');
+                        break;
+                    default:
+                        debugging(matches[0]);
                 }
             }
+        },
 
-            debugging('task=' + task.toString());
-            return task;
+        turnOnClanTaskListener () {
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask));
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask));
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton));
+        },
 
-            function generateAdditionalTask () {
-                let obj = Panels.Notices.filterMessageObjectsByKeyword('你今天已完成(.*?)个任务').last();
-                if (obj.text()) {
-                    let matches = obj.text().match('你今天已完成(.*?)个任务');
-                    switch (matches[1]) {
-                        case '24/25':
-                            ButtonManager.click('vip finish_family');
-                            break;
-                        case '19/20':
-                            ButtonManager.click('vip finish_clan');
-                            break;
-                        case '39/40':
-                            ButtonManager.click('vip finish_clan');
-                            break;
-                        default:
-                            debugging(matches[0]);
-                    }
-                }
+        turnOnMasterTaskListener () {
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask));
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask));
+            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton));
+        },
+
+        turnOffClanTaskListener () {
+            InterceptorFactory.unregister('帮派申请任务');
+            InterceptorFactory.unregister('帮派自动继续任务');
+        },
+
+        turnOffMasterTaskListener () {
+            InterceptorFactory.unregister('师门申请任务');
+            InterceptorFactory.unregister('师门自动继续任务');
+        },
+
+        newClanTaskArrived (message) {
+            return GenericTaskManager._keywordAppears(message, '帮派使者：') || GenericTaskManager._keywordAppears(message, '你现在的任务是');
+        },
+
+        newMasterTaskArrived (message) {
+            return GenericTaskManager._keywordAppears(message, '道：给我') || GenericTaskManager._keywordAppears(message, '你现在的任务是');
+        },
+
+        async addressClanTask (message) {
+            await new TaskV2(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await Navigation.move('clan;scene;clan submit_task');
+        },
+
+        async addressMasterTask (message) {
+            await new TaskV2(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await Navigation.move('go_family');
+            let link = await Panels.Family.getActionLink('交任务');
+            await ExecutionManager.asyncExecute(link);
+        },
+
+        clanTaskCompletedMessageReceived (message) {
+            return GenericTaskManager._keywordAppears(message, '恭喜你完成帮派任务');
+        },
+
+        masterTaskCompletedMessageReceived (message) {
+            return GenericTaskManager._keywordAppears(message, '恭喜你完成师门任务');
+        },
+
+        resetClanTaskButton () {
+            ButtonManager.resetButtonById('id-clan-task-automation');
+        },
+
+        resetMasterTaskButton () {
+            ButtonManager.resetButtonById('id-master-task-automation');
+        },
+
+        triggerNewClanTask () {
+            Navigation.move('clan scene;clan task');
+        },
+
+        triggerNewMasterTask () {
+            Navigation.move('go_family;family_quest');
+        },
+
+        clanTaskTooMuchMessageReceived (message) {
+            return GenericTaskManager._keywordAppears(message, '今天做的帮派任务已过量，明天再来。');
+        },
+
+        masterTaskTooMuchMessageReceived (message) {
+            return GenericTaskManager._keywordAppears(message, '今天做的师门任务已过量，明天再来。');
+        },
+
+        _keywordAppears (message, keyword) {
+            if (message.get('type') === 'main_msg' && message.get('ctype') === 'text') {
+                let text = System.replaceControlCharBlank(message.get('msg'));
+                return text.includes(keyword);
             }
+
+            return false;
+        },
+
+        _createInterceptor (alias, criterial, behavior) {
+            let interceptor = new Interceptor(alias);
+            interceptor.initialize(criterial, behavior);
+
+            return interceptor;
         }
     };
 
@@ -2051,9 +2152,10 @@ window.setTimeout(function () {
     }
 
     class Combat {
-        constructor (checkInerval = 200, printCombatInfo = false) {
+        constructor (checkInerval = 200, printCombatInfo = false, zeroEnforce = false) {
             this._checkInterval = checkInerval;
             this._printCombatInfo = printCombatInfo;
+            this._zeroEnforce = zeroEnforce;
         }
 
         initialize (npc, action, skills = [], bufferReserved = 0) {
@@ -2068,6 +2170,8 @@ window.setTimeout(function () {
                 debugging(`npc ${this._npc.toString()} 不在现场。`);
                 return false;
             } else {
+                if (this._zeroEnforce) EnforceHelper.suppressEnforce();
+
                 await Objects.Npc.action(this._npc, this._action);
                 log('双方对战人员：', null, Panels.Combat.getCombatInfo);
 
@@ -2078,7 +2182,8 @@ window.setTimeout(function () {
                     await Objects.Npc.action(this._npc, this._action);
                 }
 
-                return this.perform(this._skills, this._bufferReserved);
+                await this.perform(this._skills, this._bufferReserved);
+                if (this._zeroEnforce) EnforceHelper.recoverEnforce();
             }
         }
 
@@ -2670,7 +2775,7 @@ window.setTimeout(function () {
                 });
             },
 
-            hasItem (name = '') {
+            getItemQuantityByName (name = '') {
                 return System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(`,${name},`)).length;
             }
         }
@@ -2747,6 +2852,15 @@ window.setTimeout(function () {
                 });
             },
 
+            getAvailableItemsV3 (name) {
+                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('item') && (!name || v['value'].includes(`,${name},`))).map(function (v) {
+                    let values = v['value'].split(',');
+                    let item = new Item(values[1], values[0]);
+                    debugging('发现 ' + item.toString());
+                    return item;
+                });
+            },
+
             getAvailableItemsV2 () {
                 return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('item')).map(function (v) {
                     let values = v['value'].split(',');
@@ -2797,6 +2911,16 @@ window.setTimeout(function () {
 
             getMapId () {
                 return System.globalObjectMap.get('msg_room').get('map_id');
+            },
+
+            getNpcIdsByName (name) {
+                let npcIds = System.globalObjectMap.get('msg_room').elements.filter(function (v) {
+                    return v['key'].includes('npc') && name === System.replaceControlCharBlank(v['value'].split(',')[1]);
+                }).map(function (v) {
+                    return v['value'].split(',')[0];
+                });
+
+                return npcIds;
             }
         },
 
@@ -3268,6 +3392,7 @@ window.setTimeout(function () {
                 await fire(this._dragon, DragonHelper.killDirectly);
             } else if (DragonHelper.observerMode(this._dragon)) {
                 log('发现需要观察的目标：' + this._dragon.getBonus());
+                MessageListener.enable();
 
                 await fire(this._dragon, DragonHelper.observe);
             } else {
@@ -3411,7 +3536,7 @@ window.setTimeout(function () {
     };
 
     var MessageListener = {
-        _enabled: false,
+        _enabled: true,
 
         enable () {
             log('Message monitor enabled.');
@@ -3424,12 +3549,11 @@ window.setTimeout(function () {
         },
 
         isWorking () {
+            if (!MessageListener._enabled) return false;
+
             return DragonMonitor.isActive() ||
                 TeamworkHelper.isTeamworkModeOn() ||
-                TeamworkHelper.isAnyTeamJoinRequestAccpted() ||
-                GenericTaskManager.isAutomationActive() ||
-                TeamworkHelper.Combat.isFollowingBattleActive() ||
-                TeamworkHelper.Combat.isFollowingEscapeActive();
+                TeamworkHelper.isAnyTeamJoinRequestAccpted();
         },
 
         isMessageInRejectList (messagePack) {
@@ -3437,6 +3561,7 @@ window.setTimeout(function () {
 
             if (type === 'main_msg') return false;
             if (type === 'prompt') return false;
+            if (type === 'disconnect') return false;
 
             let subtype = messagePack.get('subtype');
             if (type === 'vs' && subtype === 'text') return false;
@@ -3476,8 +3601,6 @@ window.setTimeout(function () {
                             let dragon = DragonHelper.parseDragonInfo(event);
                             new DragonMessageHandler(dragon).handle();
                         }
-                    } else if (GenericTaskManager.isAutomationActive() && GenericTaskManager.isTaskDone(message)) {
-                        GenericTaskManager.triggerNext(message);
                     }
 
                     break;
@@ -3508,6 +3631,25 @@ window.setTimeout(function () {
                         let command = new TeamworkCommandParser(message);
                         if (command.isCommandValid()) {
                             command.action();
+                        }
+                    }
+
+                    break;
+                case 'die':
+                    ButtonManager.resetButtonById('id-recover-hp-mp');
+                    if (System.isLocalServer() && document.title.includes('跨服')) {
+                        $('#id-goto-another-world').cick();
+                    }
+
+                    break;
+                case 'disconnect':
+                    log('检测到掉线，检查是否有设置断线重连...');
+                    if (System.isAutomatedReconnectRequired()) {
+                        log('检测到断线重连设置，等待 60 秒后重刷页面...');
+                        if (!System.isLocalServer()) {
+                            log('跨服掉线无须重新刷新页面。');
+                        } else {
+                            window.setTimeout(System.refreshPageIfConnectionDropped, 60000);
                         }
                     }
 
@@ -3595,6 +3737,16 @@ window.setTimeout(function () {
         },
 
         answers: { '铁手镯 可以在哪位npc那里获得？': 'a', '“白玉牌楼”场景是在哪个地图上？': 'c', '“百龙山庄”场景是在哪个地图上？': 'b', '“冰火岛”场景是在哪个地图上？': 'b', '“常春岛渡口”场景是在哪个地图上？': 'c', '“跪拜坪”场景是在哪个地图上？': 'b', '“翰墨书屋”场景是在哪个地图上？': 'c', '“花海”场景是在哪个地图上？': 'a', '“留云馆”场景是在哪个地图上？': 'b', '“日月洞”场景是在哪个地图上？': 'b', '“蓉香榭”场景是在哪个地图上？': 'c', '“三清殿”场景是在哪个地图上？': 'b', '“三清宫”场景是在哪个地图上？': 'c', '“双鹤桥”场景是在哪个地图上？': 'b', '“无名山脚”场景是在哪个地图上？': 'd', '“伊犁”场景是在哪个地图上？': 'b', '“鹰记商号”场景是在哪个地图上？': 'd', '“迎梅客栈”场景是在哪个地图上？': 'd', '“子午楼”场景是在哪个地图上？': 'c', '8级的装备摹刻需要几把刻刀': 'a', 'NPC公平子在哪一章地图': 'a', '瑷伦在晚月庄的哪个场景': 'b', '安惜迩是在那个场景': 'c', '黯然销魂掌有多少招式？': 'c', '黯然销魂掌是哪个门派的技能': 'a', '八卦迷阵是哪个门派的阵法？': 'b', '八卦迷阵是那个门派的阵法': 'a', '白金戒指可以在哪位那里获得？': 'b', '白金手镯可以在哪位那里获得？': 'a', '白蟒鞭的伤害是多少？': 'a', '白驼山第一位要拜的师傅是谁': 'a', '白银宝箱礼包多少元宝一个': 'd', '白玉腰束是腰带类的第几级装备？': 'b', '拜师风老前辈需要正气多少': 'b', '拜师老毒物需要蛤蟆功多少级': 'a', '拜师铁翼需要多少内力': 'b', '拜师小龙女需要容貌多少': 'c', '拜师张三丰需要多少正气': 'b', '包家将是哪个门派的师傅': 'a', '包拯在哪一章': 'd', '宝石合成一次需要消耗多少颗低级宝石？': 'c', '宝玉帽可以在哪位那里获得？': 'd', '宝玉鞋击杀哪个可以获得': 'a', '宝玉鞋在哪获得': 'a', '暴雨梨花针的伤害是多少？': 'c', '北斗七星阵是第几个的组队副本': 'c', '北冥神功是哪个门派的技能': 'b', '北岳殿神像后面是哪位': 'b', '匕首加什么属性': 'c', '碧海潮生剑在哪位师傅处学习': 'a', '碧磷鞭的伤害是多少？': 'b', '镖局保镖是挂机里的第几个任务': 'd', '冰魄银针的伤害是多少？': 'b', '病维摩拳是哪个门派的技能': 'b', '不可保存装备下线多久会消失': 'c', '不属于白驼山的技能是什么': 'b', '沧海护腰可以镶嵌几颗宝石': 'd', '沧海护腰是腰带类的第几级装备？': 'a', '藏宝图在哪个NPC处购买': 'a', '藏宝图在哪个处购买': 'b', '藏宝图在哪里那里买': 'a', '草帽可以在哪位那里获得？': 'b', '成功易容成异性几次可以领取易容成就奖': 'b', '成长计划第七天可以领取多少元宝？': 'd', '成长计划六天可以领取多少银两？': 'd', '成长计划需要多少元宝方可购买？': 'a', '城里打擂是挂机里的第几个任务': 'd', '充值积分不可以兑换下面什么物品': 'd', '出生选武学世家增加什么': 'a', '闯楼第几层可以获得称号“藏剑楼护法”': 'b', '闯楼第几层可以获得称号“藏剑楼楼主”': 'd', '闯楼第几层可以获得称号“藏剑楼长老”': 'c', '闯楼每多少层有称号奖励': 'a', '春风快意刀是哪个门派的技能': 'b', '春秋水色斋需要多少杀气才能进入': 'd', '从哪个处进入跨服战场': 'a', '摧心掌是哪个门派的技能': 'a', '达摩在少林哪个场景': 'c', '达摩杖的伤害是多少？': 'd', '打开引路蜂礼包可以得到多少引路蜂？': 'b', '打排行榜每天可以完成多少次？': 'a', '打土匪是挂机里的第几个任务': 'c', '打造刻刀需要多少个玄铁': 'a', '打坐增长什么属性': 'a', '大保险卡可以承受多少次死亡后不降技能等级？': 'b', '大乘佛法有什么效果': 'd', '大旗门的修养术有哪个特殊效果': 'a', '大旗门的云海心法可以提升哪个属性': 'c', '大招寺的金刚不坏功有哪个特殊效果': 'a', '大招寺的铁布衫有哪个特殊效果': 'c', '当日最低累积充值多少元即可获得返利？': 'b', '刀法基础在哪掉落': 'a', '倒乱七星步法是哪个门派的技能': 'd', '等级多少才能在世界频道聊天？': 'c', '第一个副本需要多少等级才能进入': 'd', '貂皮斗篷是披风类的第几级装备？': 'b', '丁老怪是哪个门派的终极师傅': 'a', '丁老怪在星宿海的哪个场景': 'b', '东方教主在魔教的哪个场景': 'b', '斗转星移是哪个门派的技能': 'a', '斗转星移阵是哪个门派的阵法': 'a', '毒龙鞭的伤害是多少？': 'a', '毒物阵法是哪个门派的阵法': 'b', '独孤求败有过几把剑？': 'd', '独龙寨是第几个组队副本': 'a', '读书写字301-400级在哪里买书': 'c', '读书写字最高可以到多少级': 'b', '端茶递水是挂机里的第几个任务': 'b', '断云斧是哪个门派的技能': 'a', '锻造一把刻刀需要多少玄铁碎片锻造？': 'c', '锻造一把刻刀需要多少银两？': 'a', '兑换易容面具需要多少玄铁碎片': 'c', '多少消费积分换取黄金宝箱': 'a', '多少消费积分可以换取黄金钥匙': 'b', '翻译梵文一次多少银两': 'd', '方媃是哪个门派的师傅': 'b', '飞仙剑阵是哪个门派的阵法': 'b', '风老前辈在华山哪个场景': 'b', '风泉之剑加几点悟性': 'c', '风泉之剑可以在哪位那里获得？': 'b', '风泉之剑在哪里获得': 'd', '疯魔杖的伤害是多少？': 'b', '伏虎杖的伤害是多少？': 'c', '副本完成后不可获得下列什么物品': 'b', '副本有什么奖励': 'd', '富春茶社在哪一章': 'c', '改名字在哪改？': 'd', '丐帮的绝学是什么': 'a', '丐帮的轻功是哪个': 'b', '干苦力是挂机里的第几个任务': 'a', '钢丝甲衣可以在哪位那里获得？': 'd', '高级乾坤再造丹加什么': 'b', '高级乾坤再造丹是增加什么的？': 'b', '高级突破丹多少元宝一颗': 'd', '割鹿刀可以在哪位npc那里获得？': 'b', '葛伦在大招寺的哪个场景': 'b', '根骨能提升哪个属性': 'c', '功德箱捐香火钱有什么用': 'a', '功德箱在雪亭镇的哪个场景？': 'c', '购买新手进阶礼包在挂机打坐练习上可以享受多少倍收益？': 'b', '孤独求败称号需要多少论剑积分兑换': 'b', '孤儿出身增加什么': 'd', '古灯大师是哪个门派的终极师傅': 'c', '古灯大师在大理哪个场景': 'c', '古墓多少级以后才能进去？': 'd', '寒玉床睡觉修炼需要多少点内力值': 'c', '寒玉床睡觉一次多久': 'c', '寒玉床需要切割多少次': 'd', '寒玉床在哪里切割': 'a', '寒玉床在那个地图可以找到？': 'a', '黑狗血在哪获得': 'b', '黑水伏蛟可以在哪位npc那里获得？': 'c', '洪帮主在洛阳哪个场景': 'c', '虎皮腰带是腰带类的第几级装备？': 'a', '花不为在哪一章': 'a', '铁手镯 可以在哪位npc那里获得？': 'a', '花花公子在哪个地图': 'a', '华山村王老二掉落的物品是什么': 'a', '华山武器库从哪个NPC进': 'd', '黄宝石加什么属性': 'c', '黄岛主在桃花岛的哪个场景': 'd', '黄袍老道是哪个门派的师傅': 'c', '积分商城在雪亭镇的哪个场景？': 'c', '技能柳家拳谁教的？': 'a', '技能数量超过了什么消耗潜能会增加': 'b', '嫁衣神功是哪个门派的技能': 'b', '剑冢在哪个地图': 'a', '街头卖艺是挂机里的第几个任务': 'a', '金弹子的伤害是多少？': 'a', '金刚不坏功有什么效果': 'a', '金刚杖的伤害是多少？': 'a', '金戒指可以在哪位npc那里获得？': 'd', '金手镯可以在哪位npc那里获得？': 'b', '金丝鞋可以在哪位npc那里获得？': 'b', '金项链可以在哪位npc那里获得？': 'd', '金玉断云是哪个门派的阵法': 'a', '锦缎腰带是腰带类的第几级装备？': 'a', '精铁棒可以在哪位那里获得？': 'd', '九区服务器名称': 'd', '九阳神功是哪个门派的技能': 'c', '九阴派梅师姐在星宿海哪个场景': 'a', '军营是第几个组队副本': 'b', '开通VIP月卡最低需要当天充值多少元方有购买资格？': 'a', '可以召唤金甲伏兵助战是哪个门派？': 'a', '客商在哪一章': 'b', '孔雀氅可以镶嵌几颗宝石': 'b', '孔雀氅是披风类的第几级装备？': 'c', '枯荣禅功是哪个门派的技能': 'a', '跨服是星期几举行的': 'b', '跨服天剑谷每周六几点开启': 'a', '跨服需要多少级才能进入': 'c', '跨服在哪个场景进入': 'c', '兰花拂穴手是哪个门派的技能': 'a', '蓝宝石加什么属性': 'a', '蓝止萍在哪一章': 'c', '蓝止萍在晚月庄哪个小地图': 'b', '老毒物在白驮山的哪个场景': 'b', '老顽童在全真教哪个场景': 'b', '烈火旗大厅是那个地图的场景': 'c', '烈日项链可以镶嵌几颗宝石': 'c', '林祖师是哪个门派的师傅': 'a', '灵蛇杖法是哪个门派的技能': 'c', '凌波微步是哪个门派的技能': 'b', '凌虚锁云步是哪个门派的技能': 'b', '领取消费积分需要寻找哪个NPC？': 'c', '鎏金缦罗是披风类的第几级装备？': 'd', '柳淳风在哪一章': 'c', '柳淳风在雪亭镇哪个场景': 'b', '柳文君所在的位置': 'a', '六脉神剑是哪个门派的绝学': 'a', '陆得财是哪个门派的师傅': 'c', '陆得财在乔阴县的哪个场景': 'a', '论剑每天能打几次': 'a', '论剑是每周星期几': 'c', '论剑是什么时间点正式开始': 'a', '论剑是星期几进行的': 'c', '论剑是星期几举行的': 'c', '论剑输一场获得多少论剑积分': 'a', '论剑要在晚上几点前报名': 'b', '论剑在周几进行？': 'b', '论剑中步玄派的师傅是哪个': 'a', '论剑中大招寺第一个要拜的师傅是谁': 'c', '论剑中古墓派的终极师傅是谁': 'd', '论剑中花紫会的师傅是谁': 'c', '论剑中青城派的第一个师傅是谁': 'a', '论剑中青城派的终极师傅是谁': 'd', '论剑中逍遥派的终极师傅是谁': 'c', '论剑中以下不是峨嵋派技能的是哪个': 'b', '论剑中以下不是华山派的人物的是哪个': 'd', '论剑中以下哪个不是大理段家的技能': 'c', '论剑中以下哪个不是大招寺的技能': 'b', '论剑中以下哪个不是峨嵋派可以拜师的师傅': 'd', '论剑中以下哪个不是丐帮的技能': 'd', '论剑中以下哪个不是丐帮的人物': 'a', '论剑中以下哪个不是古墓派的的技能': 'b', '论剑中以下哪个不是华山派的技能的': 'd', '论剑中以下哪个不是明教的技能': 'd', '论剑中以下哪个不是魔教的技能': 'a', '论剑中以下哪个不是魔教的人物': 'd', '论剑中以下哪个不是全真教的技能': 'd', '论剑中以下哪个不是是晚月庄的技能': 'd', '论剑中以下哪个不是唐门的技能': 'c', '论剑中以下哪个不是唐门的人物': 'c', '论剑中以下哪个不是铁雪山庄的技能': 'd', '论剑中以下哪个不是铁血大旗门的技能': 'c', '论剑中以下哪个是大理段家的技能': 'a', '论剑中以下哪个是大招寺的技能': 'b', '论剑中以下哪个是丐帮的技能': 'b', '论剑中以下哪个是花紫会的技能': 'a', '论剑中以下哪个是华山派的技能的': 'a', '论剑中以下哪个是明教的技能': 'b', '论剑中以下哪个是青城派的技能': 'b', '论剑中以下哪个是唐门的技能': 'b', '论剑中以下哪个是天邪派的技能': 'b', '论剑中以下哪个是天邪派的人物': 'a', '论剑中以下哪个是铁雪山庄的技能': 'c', '论剑中以下哪个是铁血大旗门的技能': 'b', '论剑中以下哪个是铁血大旗门的师傅': 'a', '论剑中以下哪个是晚月庄的技能': 'a', '论剑中以下哪个是晚月庄的人物': 'a', '论剑中以下是峨嵋派技能的是哪个': 'a', '论语在哪购买': 'a', '骆云舟在哪一章': 'c', '骆云舟在乔阴县的哪个场景': 'b', '落英神剑掌是哪个门派的技能': 'b', '吕进在哪个地图': 'a', '绿宝石加什么属性': 'c', '漫天花雨匕在哪获得': 'a', '茅山的绝学是什么': 'b', '茅山的天师正道可以提升哪个属性': 'd', '茅山可以招几个宝宝': 'c', '茅山派的轻功是什么': 'b', '茅山天师正道可以提升什么': 'c', '茅山学习什么技能招宝宝': 'a', '茅山在哪里拜师': 'c', '每次合成宝石需要多少银两？': 'a', '每个玩家最多能有多少个好友': 'b', '每天的任务次数几点重置': 'd', '每天分享游戏到哪里可以获得20元宝': 'a', '每天能挖几次宝': 'd', '每天能做多少个谜题任务': 'a', '每天能做多少个师门任务': 'c', '每天微信分享能获得多少元宝': 'd', '每天有几次试剑': 'b', '每天在线多少个小时即可领取消费积分？': 'b', '每突破一次技能有效系数加多少': 'a', '密宗伏魔是哪个门派的阵法': 'c', '灭绝师太在第几章': 'c', '灭绝师太在峨眉山哪个场景': 'a', '明教的九阳神功有哪个特殊效果': 'a', '明月帽要多少刻刀摩刻？': 'a', '摹刻10级的装备需要摩刻技巧多少级': 'b', '摹刻烈日宝链需要多少级摩刻技巧？': 'c', '摹刻扬文需要多少把刻刀？': 'a', '魔教的大光明心法可以提升哪个属性': 'd', '莫不收在哪一章': 'a', '墨磷腰带是腰带类的第几级装备？': 'd', '木道人在青城山的哪个场景': 'b', '慕容家主在慕容山庄的哪个场景': 'a', '慕容山庄的斗转星移可以提升哪个属性': 'd', '哪个NPC掉落拆招基础': 'a', '哪个处可以捏脸': 'a', '哪个分享可以获得20元宝': 'b', '哪个技能不是魔教的': 'd', '哪个门派拜师没有性别要求': 'd', '哪个npc属于全真七子': 'b', '哪样不能获得玄铁碎片': 'c', '能增容貌的是下面哪个技能': 'a', '捏脸需要花费多少银两？': 'c', '捏脸需要寻找哪个NPC？': 'a', '欧阳敏是哪个门派的？': 'b', '欧阳敏是哪个门派的师傅': 'b', '欧阳敏在哪一章': 'a', '欧阳敏在唐门的哪个场景': 'c', '排行榜最多可以显示多少名玩家？': 'a', '逄义是在那个场景': 'a', '披星戴月是披风类的第几级装备？': 'd', '劈雳拳套有几个镶孔': 'a', '霹雳掌套的伤害是多少': 'b', '辟邪剑法是哪个门派的绝学技能': 'a', '辟邪剑法在哪学习': 'b', '婆萝蜜多心经是哪个门派的技能': 'b', '七宝天岚舞是哪个门派的技能': 'd', '七星鞭的伤害是多少？': 'c', '七星剑法是哪个门派的绝学': 'a', '棋道是哪个门派的技能': 'c', '千古奇侠称号需要多少论剑积分兑换': 'd', '乾坤大挪移属于什么类型的武功': 'a', '乾坤一阳指是哪个师傅教的': 'a', '青城派的道德经可以提升哪个属性': 'c', '青城派的道家心法有哪个特殊效果': 'a', '清风寨在哪': 'b', '清风寨在哪个地图': 'd', '清虚道长在哪一章': 'd', '去唐门地下通道要找谁拿钥匙': 'a', '全真的道家心法有哪个特殊效果': 'a', '全真的基本阵法有哪个特殊效果': 'b', '全真的双手互搏有哪个特殊效果': 'c', '日月神教大光明心法可以提升什么': 'd', '如何将华山剑法从400级提升到440级？': 'd', '如意刀是哪个门派的技能': 'c', '山河藏宝图需要在哪个NPC手里购买？': 'd', '上山打猎是挂机里的第几个任务': 'c', '少林的混元一气功有哪个特殊效果': 'd', '少林的易筋经神功有哪个特殊效果': 'a', '蛇形刁手是哪个门派的技能': 'b', '首次通过乔阴县不可以获得那种奖励？': 'a', '什么影响打坐的速度': 'c', '什么影响攻击力': 'd', '什么装备不能镶嵌黄水晶': 'd', '什么装备都能镶嵌的是什么宝石？': 'c', '什么装备可以镶嵌紫水晶': 'c', '神雕大侠所在的地图': 'b', '神雕大侠在哪一章': 'a', '神雕侠侣的时代背景是哪个朝代？': 'd', '神雕侠侣的作者是?': 'b', '升级什么技能可以提升根骨': 'a', '生死符的伤害是多少？': 'a', '师门磕头增加什么': 'a', '师门任务每天可以完成多少次？': 'a', '师门任务每天可以做多少个？': 'c', '师门任务什么时候更新？': 'b', '师门任务一天能完成几次': 'd', '师门任务最多可以完成多少个？': 'd', '施令威在哪个地图': 'b', '石师妹哪个门派的师傅': 'c', '使用朱果经验潜能将分别增加多少？': 'a', '首次通过桥阴县不可以获得那种奖励？': 'a', '受赠的消费积分在哪里领取': 'd', '兽皮鞋可以在哪位那里获得？': 'b', '树王坟在第几章节': 'c', '双儿在扬州的哪个小地图': 'a', '孙天灭是哪个门派的师傅': 'c', '踏雪无痕是哪个门派的技能': 'b', '踏云棍可以在哪位那里获得？': 'a', '唐门的唐门毒经有哪个特殊效果': 'a', '唐门密道怎么走': 'c', '天蚕围腰可以镶嵌几颗宝石': 'd', '天蚕围腰是腰带类的第几级装备？': 'd', '天山姥姥在逍遥林的哪个场景': 'd', '天山折梅手是哪个门派的技能': 'c', '天师阵法是哪个门派的阵法': 'b', '天邪派在哪里拜师': 'b', '天羽奇剑是哪个门派的技能': 'a', '铁戒指可以在哪位那里获得？': 'a', '铁血大旗门云海心法可以提升什么': 'a', '通灵需要花费多少银两？': 'd', '通灵需要寻找哪个NPC？': 'c', '突破丹在哪里购买': 'b', '屠龙刀法是哪个门派的绝学技能': 'b', '屠龙刀是什么级别的武器': 'a', '挖剑冢可得什么': 'a', '弯月刀可以在哪位那里获得？': 'b', '玩家每天能够做几次正邪任务': 'c', '玩家想修改名字可以寻找哪个NPC？': 'a', '晚月庄的内功是什么': 'b', '晚月庄的七宝天岚舞可以提升哪个属性': 'b', '晚月庄的小贩在下面哪个地点': 'a', '晚月庄七宝天岚舞可以提升什么': 'b', '晚月庄主线过关要求': 'a', '王铁匠是在那个场景': 'b', '王重阳是哪个门派的师傅': 'b', '魏无极处读书可以读到多少级？': 'a', '魏无极身上掉落什么装备': 'c', '魏无极在第几章': 'a', '闻旗使在哪个地图': 'a', '乌金玄火鞭的伤害是多少？': 'd', '乌檀木刀可以在哪位npc那里获得？': 'd', '钨金腰带是腰带类的第几级装备？': 'd', '武当派的绝学技能是以下哪个': 'd', '武穆兵法提升到多少级才能出现战斗必刷？': 'd', '武穆兵法通过什么学习': 'a', '武学世家加的什么初始属性': 'a', '舞中之武是哪个门派的阵法': 'b', '西毒蛇杖的伤害是多少？': 'c', '吸血蝙蝠在下面哪个地图': 'a', '下列哪项战斗不能多个玩家一起战斗？': 'a', '下列装备中不可摹刻的是': 'c', '下面哪个不是古墓的师傅': 'd', '下面哪个不是门派绝学': 'd', '下面哪个不是魔教的': 'd', '下面哪个地点不是乔阴县的': 'd', '下面哪个门派是正派': 'a', '下面哪个是天邪派的师傅': 'a', '下面有什么是寻宝不能获得的': 'c', '向师傅磕头可以获得什么？': 'b', '逍遥步是哪个门派的技能': 'a', '逍遥林是第几章的地图': 'c', '逍遥林怎么弹琴可以见到天山姥姥': 'b', '逍遥派的绝学技能是以下哪个': 'a', '萧辟尘在哪一章': 'd', '小李飞刀的伤害是多少？': 'd', '小龙女住的古墓是谁建造的？': 'b', '小男孩在华山村哪里': 'a', '新人礼包在哪个npc处兑换': 'a', '新手礼包在哪里领取': 'a', '新手礼包在哪领取？': 'c', '需要使用什么衣服才能睡寒玉床': 'a', '选择孤儿会影响哪个属性': 'c', '选择商贾会影响哪个属性': 'b', '选择书香门第会影响哪个属性': 'b', '选择武学世家会影响哪个属性': 'a', '学习屠龙刀法需要多少内力': 'b', '雪莲有什么作用': 'a', '雪蕊儿是哪个门派的师傅': 'a', '雪蕊儿在铁雪山庄的哪个场景': 'd', '扬文的属性': 'a', '扬州询问黑狗能到下面哪个地点': 'a', '扬州在下面哪个地点的处可以获得玉佩': 'c', '羊毛斗篷是披风类的第几级装备？': 'a', '阳刚之劲是哪个门派的阵法': 'c', '杨过小龙女分开多少年后重逢?': 'c', '杨过在哪个地图': 'a', '夜行披风是披风类的第几级装备？': 'a', '夜皇在大旗门哪个场景': 'c', '一个队伍最多有几个队员': 'c', '一天能完成谜题任务多少个': 'b', '一天能完成师门任务有多少个': 'c', '一天能完成挑战排行榜任务多少次': 'a', '一张分身卡的有效时间是多久': 'c', '一指弹在哪里领悟': 'b', '移开明教石板需要哪项技能到一定级别': 'a', '以下不是步玄派的技能的哪个': 'c', '以下不是天宿派师傅的是哪个': 'c', '以下不是隐藏门派的是哪个': 'd', '以下哪个宝石不能镶嵌到戒指': 'c', '以下哪个宝石不能镶嵌到内甲': 'a', '以下哪个宝石不能镶嵌到披风': 'c', '以下哪个宝石不能镶嵌到腰带': 'c', '以下哪个宝石不能镶嵌到衣服': 'a', '以下哪个不是道尘禅师教导的武学？': 'd', '以下哪个不是何不净教导的武学？': 'c', '以下哪个不是慧名尊者教导的技能？': 'd', '以下哪个不是空空儿教导的武学？': 'b', '以下哪个不是梁师兄教导的武学？': 'b', '以下哪个不是论剑的皮肤？': 'd', '以下哪个不是全真七子？': 'c', '以下哪个不是宋首侠教导的武学？': 'd', '以下哪个不是微信分享好友、朋友圈、QQ空间的奖励？': 'a', '以下哪个不是岳掌门教导的武学？': 'a', '以下哪个不是在雪亭镇场景': 'd', '以下哪个不是在扬州场景': 'd', '以下哪个不是知客道长教导的武学？': 'b', '以下哪个门派不是隐藏门派？': 'c', '以下哪个门派是正派？': 'd', '以下哪个门派是中立门派？': 'a', '以下哪个是步玄派的祖师': 'b', '以下哪个是封山派的祖师': 'c', '以下哪个是花紫会的祖师': 'a', '以下哪个是晚月庄的祖师': 'd', '以下哪些物品不是成长计划第二天可以领取的？': 'c', '以下哪些物品不是成长计划第三天可以领取的？': 'd', '以下哪些物品不是成长计划第一天可以领取的？': 'd', '以下哪些物品是成长计划第四天可以领取的？': 'a', '以下哪些物品是成长计划第五天可以领取的？': 'b', '以下属于邪派的门派是哪个': 'b', '以下属于正派的门派是哪个': 'a', '以下谁不精通降龙十八掌？': 'd', '以下有哪些物品不是每日充值的奖励？': 'd', '倚天剑加多少伤害': 'd', '倚天屠龙记的时代背景哪个朝代？': 'a', '易容后保持时间是多久': 'a', '易容面具需要多少玄铁兑换': 'c', '易容术多少级才可以易容成异性NPC': 'a', '易容术可以找哪位NPC学习？': 'b', '易容术向谁学习': 'a', '易容术在哪里学习': 'a', '易容术在哪学习？': 'b', '银手镯可以在哪位那里获得？': 'b', '银丝链甲衣可以在哪位npc那里获得？': 'a', '银项链可以在哪位那里获得？': 'b', '尹志平是哪个门派的师傅': 'b', '隐者之术是那个门派的阵法': 'a', '鹰爪擒拿手是哪个门派的技能': 'a', '影响你出生的福缘的出生是？': 'd', '油流麻香手是哪个门派的技能': 'a', '游龙散花是哪个门派的阵法': 'd', '玉蜂浆在哪个地图获得': 'a', '玉女剑法是哪个门派的技能': 'b', '岳掌门在哪一章': 'a', '云九天是哪个门派的师傅': 'c', '云问天在哪一章': 'a', '在洛阳萧问天那可以学习什么心法': 'b', '在庙祝处洗杀气每次可以消除多少点': 'a', '在哪个NPC可以购买恢复内力的药品？': 'c', '在哪个处可以更改名字': 'a', '在哪个处领取免费消费积分': 'd', '在哪个处能够升级易容术': 'b', '在哪里可以找到“香茶”？': 'a', '在哪里捏脸提升容貌': 'd', '在哪里消杀气': 'a', '在逍遥派能学到的技能是哪个': 'a', '在雪亭镇李火狮可以学习多少级柳家拳': 'b', '在战斗界面点击哪个按钮可以进入聊天界面': 'd', '在正邪任务中不能获得下面什么奖励？': 'd', '怎么样获得免费元宝': 'a', '赠送李铁嘴银两能够增加什么': 'a', '张教主在明教哪个场景': 'd', '张三丰在哪一章': 'd', '张三丰在武当山哪个场景': 'd', '张松溪在哪个地图': 'c', '张天师是哪个门派的师傅': 'a', '张天师在茅山哪个场景': 'd', '长虹剑在哪位那里获得？': 'a', '正邪任务杀死好人增长什么': 'b', '正邪任务一天能做几次': 'a', '正邪任务中客商的在哪个地图': 'a', '正邪任务中卖花姑娘在哪个地图': 'b', '正邪任务最多可以完成多少个？': 'd', '支线对话书生上魁星阁二楼杀死哪个NPC给10元宝': 'a', '朱姑娘是哪个门派的师傅': 'a', '朱老伯在华山村哪个小地图': 'b', '追风棍可以在哪位npc那里获得？': 'a', '追风棍在哪里获得': 'b', '紫宝石加什么属性': 'd', '下面哪个npc不是魔教的': 'd', '藏宝图在哪里npc那里买': 'a', '从哪个npc处进入跨服战场': 'a', '钻石项链在哪获得': 'a', '在哪个npc处能够升级易容术': 'b', '扬州询问黑狗子能到下面哪个地点': 'a', '北岳殿神像后面是哪位npc': 'b', '兽皮鞋可以在哪位npc那里获得？': 'b', '在哪个npc处领取免费消费积分': 'd', '踏云棍可以在哪位npc那里获得？': 'a', '钢丝甲衣可以在哪位npc那里获得？': 'd', '哪个npc处可以捏脸': 'a', '草帽可以在哪位npc那里获得？': 'b', '铁戒指可以在哪位npc那里获得？': 'a', '银项链可以在哪位npc那里获得？': 'b', '在哪个npc处可以更改名字': 'a', '长剑在哪里可以购买？': 'a', '宝玉帽可以在哪位npc那里获得？': 'd', '论剑中以下哪个不是晚月庄的技能': 'd', '精铁棒可以在哪位npc那里获得？': 'd', '弯月刀可以在哪位npc那里获得？': 'b', 'vip每天不可以领取什么': 'b', '华山施戴子掉落的物品是什么': 'b', '藏宝图在哪个npc处购买': 'b', '宝玉鞋击杀哪个npc可以获得': 'a', '银手镯可以在哪位npc那里获得？': 'b', '莲花掌是哪个门派的技能': 'a', '红宝石加什么属性': 'b', '以下哪个不是在洛阳场景': 'd', '风泉之剑可以在哪位npc那里获得？': 'b', '魔鞭诀在哪里学习': 'd', '副本一次最多可以进几人': 'a', '城里抓贼是挂机里的第几个任务': 'b', '扬州在下面哪个地点的npc处可以获得玉佩': 'c', '白金戒指可以在哪位npc那里获得？': 'b', '长虹剑在哪位npc那里获得？': 'a', '跨服天剑谷是星期几举行的': 'b', '白金手镯可以在哪位npc那里获得？': 'a', '白金项链可以在哪位npc那里获得？': 'b' }
+    };
+
+    var DeathHelper = {
+        async resolveDeathBookIfAny () {
+            let bookQuantity = Panels.Backpack.getItemQuantityByName('生死簿');
+            if (bookQuantity) {
+                await ButtonManager.click(`#${bookQuantity} event_1_64058963 go`);
+                log(`销毁生死簿：${bookQuantity} 本`);
+            }
+        }
     };
 
     var SecretPlaceHelper = {
@@ -3687,7 +3839,7 @@ window.setTimeout(function () {
             return PathManager._PATHS._GENERIC_TASK._PURCHASE[target];
         },
 
-        getPathForItemsWithNpcBody (target) {
+        getPathForItemsFromNpcBody (target) {
             return PathManager._PATHS._GENERIC_TASK._BODY[target];
         },
 
@@ -4444,9 +4596,9 @@ window.setTimeout(function () {
 
     function log (message, obj, func = null) {
         if (func || obj) {
-            func ? console.log(message, obj, func()) : console.log(message, obj);
+            func ? console.info(message, obj, func()) : console.info(message, obj);
         } else {
-            console.log(message);
+            console.info(message);
         }
     }
 
@@ -4650,6 +4802,13 @@ window.setTimeout(function () {
                 }
             }
         }, {
+            label: '当前监听',
+            title: '日志输出当前监听器信息以供调试...',
+
+            async eventOnClick () {
+                log('当前监听', InterceptorFactory.getInterceptors());
+            }
+        }, {
         }, {
             label: '飞地图',
             title: '跑地图...',
@@ -4794,6 +4953,26 @@ window.setTimeout(function () {
                 }
             }
         }, {
+        }, {
+            label: '自动重连',
+            title: '点下按钮会在页面断开连接后一分钟自动重新刷新页面。',
+            id: 'id-page-refresh',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (!System.isLocalServer()) {
+                        window.alert('跨服不支持自动重连，避免逻辑死循环。');
+                        ButtonManager.resetButtonById(this.id);
+                        return;
+                    }
+
+                    System.setAutomatedReconnect(true);
+                } else {
+                    System.setAutomatedReconnect(false);
+                }
+            }
+        }, {
+        }, {
             label: '检测状态',
             title: '自动检测状态...',
             id: 'id-auto-status-reset',
@@ -4836,16 +5015,23 @@ window.setTimeout(function () {
         }, {
             label: '一键跨服',
             title: '自动寻路到杜宽处，进入跨服...\n\n注意：进入跨服会自动换成战斗装备。',
+            id: 'id-goto-another-world',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
 
+                    await DeathHelper.resolveDeathBookIfAny();
+
                     await ButtonManager.click('event_1_36344468');
                     await ExecutionManager.wait(1000);
 
-                    document.title = User.getName() + '-跨服';
+                    if (!document.title.includes('-跨服')) document.title = User.getName() + '-跨服';
+
                     $('#id-equipment-for-combat').click();
+
+                    await ExecutionManager.wait(2000);
+                    ButtonManager.pressDown('id-recover-hp-mp');
                 } else {
                     await Navigation.move('home;home;home;home');
                     document.title = User.getName();
@@ -5320,7 +5506,7 @@ window.setTimeout(function () {
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     let warning = '';
-                    if (!Panels.Backpack.hasItem('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
+                    if (!Panels.Backpack.getItemQuantityByName('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
                     if (Objects.Room.getName() !== '天山山脚') warning = '请先自行走到天山山脚。';
 
                     if (warning) {
@@ -5644,51 +5830,32 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '自动继续',
-            title: '本按钮按下时，师门和帮派任务会自动尝试下一个，直到失败。',
-            id: 'id-master-clan-task-automation',
+            label: '帮',
+            title: '本按钮按下时，帮派任务会自动进行，直到中途因为意外停止。',
+            id: 'id-clan-task-automation',
+            width: '38px',
+            marginRight: '1px',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    GenericTaskManager.startAutomation();
+                    GenericTaskManager.turnOnClanTaskListener();
+                    GenericTaskManager.triggerNewClanTask();
                 } else {
-                    GenericTaskManager.stopAutomation();
+                    GenericTaskManager.turnOffClanTaskListener();
                 }
             }
         }, {
             label: '师',
-            title: '每点一次自动申领并完成一个师门任务（战斗、购买、拾物及搜身类均已支持）。\n\n注意：\n1. 考虑到地图路径还不完全，当前版本暂不支持一键全自动所有任务。\n2. 少量任务会自动消耗引路蜂\n3. 脚本自动判断第 25 个时 vip 点掉并继续第 26 个\n\n如有发现某个任务无法完成，请告知任务信息比如 \'给我在19分20秒内杀乞丐。任务所在地方好像是：大昭寺-八角街\'',
-            width: '38px',
-            id: 'id-task-master',
-            marginRight: '1px',
-
-            async eventOnClick () {
-                await ButtonManager.click('go_family');
-                await ButtonManager.click('family_quest');
-                if (Panels.Notices.containsMessage('今天做的师门任务已过量，明天再来。')) return;
-
-                if (await GenericTaskManager.handleTask()) {
-                    ButtonManager.click('prev_combat;go_family');
-                    await ExecutionManager.wait(500);
-                    let link = await Panels.Family.getActionLink('交任务');
-                    await ExecutionManager.asyncExecute(link);
-                }
-            }
-        }, {
-            label: '帮',
-            title: '和师门任务类似，所有功能通用',
-            id: 'id-task-clan',
+            title: '本按钮按下时，师门任务会自动进行，直到中途因为意外停止。',
+            id: 'id-master-task-automation',
             width: '38px',
 
             async eventOnClick () {
-                await ButtonManager.click('clan scene;clan task', 800);
-                if (Panels.Notices.containsMessage('今天做的帮派任务已过量，明天再来。')) return;
-
-                if (await GenericTaskManager.handleTask()) {
-                    ButtonManager.click('prev_combat;clan scene');
-                    await ExecutionManager.wait(800);
-                    let link = await Panels.Family.getActionLink('交任务');
-                    await ExecutionManager.asyncExecute(link);
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    GenericTaskManager.turnOnMasterTaskListener();
+                    GenericTaskManager.triggerNewMasterTask();
+                } else {
+                    GenericTaskManager.turnOffMasterTaskListener();
                 }
             }
         }, {
@@ -6591,6 +6758,8 @@ window.setTimeout(function () {
 
         $('#id-leftover-tasks').click();
         $('#测试中功能').click();
+
+        System.loadLastButtonStatus();
     }
 
     inintializeHelpButtons(helperConfigurations);
@@ -6605,7 +6774,9 @@ window.setTimeout(function () {
             new MessageDispatcher(messagePack).dispatch();
         }
 
-        if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
+        InterceptorFactory.getInterceptors().forEach(v => v.handle(messagePack));
+
+        if (MessageListener.isWorking() && !MessageListener.isMessageInLoggingRejectedList(messagePack)) {
             debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
         }
     };
