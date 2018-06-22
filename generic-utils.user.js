@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.42
+// @version      2.1.43
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1810,7 +1810,7 @@ window.setTimeout(function () {
                             `${name}疑惑地看着你，道：你想干什么？`,
                             `${name}摇摇头，说道：你在这做什么？`,
                             '郭济说道：排云掌法威力奇大，招式飘忽，似乎当年创出此掌法之人出自嵩山，你替我找找看是否还有后人存在'
-                        ].join(`| `);
+                        ].join(`|`);
                         debugging('pattern=' + result);
                         return result;
                     }
