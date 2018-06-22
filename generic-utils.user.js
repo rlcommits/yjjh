@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.39
+// @version      2.1.40
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3012,16 +3012,16 @@ window.setTimeout(function () {
         }
     };
 
-    var MapCleanerV2 = {
+    var AutomatedMapCleaner = {
         _retry: new Retry(100),
         _path: [],
         _stop: false,
 
         initialize (travelsalPath = [], interval = 2500) {
-            MapCleanerV2._stop = false;
-            MapCleanerV2._path = travelsalPath;
+            AutomatedMapCleaner._stop = false;
+            AutomatedMapCleaner._path = travelsalPath;
 
-            MapCleanerV2._retry.initialize(async function killAndMove () {
+            AutomatedMapCleaner._retry.initialize(async function killAndMove () {
                 let npcs = Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero'));
                 if (npcs.length) {
                     let combat = new Combat();
@@ -3033,10 +3033,14 @@ window.setTimeout(function () {
 
                 await Objects.Room.refresh();
                 if (!Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero')).length) {
-                    await Navigation.move(MapCleanerV2._path.shift());
+                    if (AutomatedMapCleaner._path.length === 0) {
+                        AutomatedMapCleaner._stop = true;
+                    } else {
+                        await Navigation.move(AutomatedMapCleaner._path.shift());
+                    }
                 }
             }, function stopWhen () {
-                return MapCleanerV2._stop;
+                return AutomatedMapCleaner._stop;
             });
         },
 
@@ -3045,11 +3049,11 @@ window.setTimeout(function () {
         },
 
         async start () {
-            MapCleanerV2._retry.fire();
+            AutomatedMapCleaner._retry.fire();
         },
 
         stop () {
-            MapCleanerV2._stop = true;
+            AutomatedMapCleaner._stop = true;
         }
     };
 
@@ -4335,6 +4339,7 @@ window.setTimeout(function () {
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
 
                 '冰月谷': 'jh 14;w;#4 n;event_1_32682066',
+
                 '冰湖': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;e',
                 '扬州出发钓鱼加玄铁': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
                 '钓鱼加玄铁': 'jh 35;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
@@ -4947,6 +4952,29 @@ window.setTimeout(function () {
                     }
                 } else {
                     JobManager.getJob(this.id).stop();
+                }
+            }
+        }, {
+            label: '自动冰月',
+            title: '一键从任意处进入冰月谷，并自动杀死相关 npc 拿到长生石宝箱。',
+            id: 'id-ice-moon-valley-v2',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
+                        if (Objects.Room.getMapId() !== 'bingyuegu') {
+                            await AutomatedMapCleaner.gotoStartPoint(PathManager.getPathForSpecificEvent('冰月谷'));
+                            await ExecutionManager.wait(2000);
+                        }
+
+                        AutomatedMapCleaner.initialize('~寒冰之湖;~冰月湖心'.split(';'), 3000);
+
+                        await AutomatedMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    AutomatedMapCleaner.stop();
                 }
             }
         }, {
@@ -5962,14 +5990,14 @@ window.setTimeout(function () {
                     }
 
                     if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
-                        MapCleanerV2.initialize(ForestHelper.getTraversalPath().split(';').extract(), 5000);
+                        AutomatedMapCleaner.initialize(ForestHelper.getTraversalPath().split(';').extract(), 5000);
 
-                        await MapCleanerV2.start();
+                        await AutomatedMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
-                    MapCleanerV2.stop();
+                    AutomatedMapCleaner.stop();
                 }
             }
         }, {
