@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.40
+// @version      2.1.41
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -546,8 +546,6 @@ window.setTimeout(function () {
         }
 
         handle (message) {
-            debugging(message);
-
             if (this._criterial(message)) {
                 this._behavior(message);
             }
@@ -617,6 +615,7 @@ window.setTimeout(function () {
             }
 
             await Navigation.move(this._path && this._path !== 'find_family_quest_road;find_clan_quest_road' ? this._path : this._shortcut);
+            await ExecutionManager.wait(500);
 
             if (this._action) {
                 let combat = new Combat(200, false, true);
@@ -668,6 +667,31 @@ window.setTimeout(function () {
                 let info = place.split('-');
                 return new Npc(info[info.length - 1]);
             }
+        }
+    };
+
+    var FrescoHelper = {
+        _stop: false,
+
+        async startTrying () {
+            FrescoHelper._stop = false;
+
+            let retry = new Retry(1000);
+            retry.initialize(async function gotoTarget () {
+                await EscapeHelper.tryOneoffEscape();
+
+                await Navigation.move('jh 26;w;w;n;w;w;w;n;n;e');
+                await ExecutionManager.wait(1000);
+            }, function stopWhen () {
+                return Objects.Room.getEventByName('参习岩画') || FrescoHelper._stop;
+            });
+
+            await retry.fire();
+            await Navigation.move('~参习岩画;home');
+        },
+
+        stopTrying () {
+            FrescoHelper._stop = true;
         }
     };
 
@@ -751,11 +775,11 @@ window.setTimeout(function () {
         },
 
         triggerNewClanTask () {
-            Navigation.move('clan scene;clan task');
+            Navigation.move('#wait 500;clan scene;clan task');
         },
 
         triggerNewMasterTask () {
-            Navigation.move('go_family;family_quest');
+            Navigation.move('#wait 500;go_family;family_quest');
         },
 
         clanTaskTooMuchMessageReceived (message) {
@@ -1187,7 +1211,7 @@ window.setTimeout(function () {
             '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
             '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
             '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
-            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫',
+            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫', '绣花鞋', '舞蝶彩衫',
             '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
             '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
             '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
@@ -3714,7 +3738,7 @@ window.setTimeout(function () {
             await ButtonManager.click('question', 300);
 
             if (QuizzesHelper._stop || Panels.Quizzes.containsMessage('每日武林知识问答次数已经达到限额') || Panels.Notices.containsMessage('每日武林知识问答次数已经达到限额')) {
-                ButtonManager.resetButtonById('btnQuizzesHelper');
+                ButtonManager.resetButtonById('id-quizzes-helper');
                 return;
             }
 
@@ -3941,6 +3965,7 @@ window.setTimeout(function () {
                     '少林寺-月台-托钵僧': 'jh 13;#6 n',
                     '武当山-藏经阁-道童': 'jh 10;w;n;n;#3 w;#5 n;w;n',
                     '大昭寺-八角街-樵夫': 'jh 26;#6 w;s;s;#4 w',
+                    '大昭寺-八角街-乞丐': 'jh 26;#6 w;n;n;w',
                     '断剑山庄-下棋亭-黑袍老人': 'jh 34;ne;#5 e;n;e;n',
                     '断剑山庄-下棋亭-白袍老人': 'jh 34;ne;#5 e;n;e;n',
                     '断剑山庄-小船-摆渡老人': 'find_family_quest_road;find_clan_quest_road',
@@ -3958,6 +3983,7 @@ window.setTimeout(function () {
                     '星宿海-天山下-波斯商人': 'jh 28',
                     '星宿海-天山山路-星宿派鼓手': 'jh 28;n;n',
                     '星宿海-天山山路-采药人': 'jh 28;n;w;w',
+                    '星宿海-天山山路-牧羊人': 'jh 28;ne',
                     '星宿海-赛马场-阿拉木罕': 'jh 28;nw;nw',
                     '慕容山庄-雅致大厅-慕容老夫人': 'jh 32;n;n;se;n',
                     '慕容山庄-小舟-碧姑娘': 'find_family_quest_road;find_clan_quest_road',
@@ -4475,6 +4501,17 @@ window.setTimeout(function () {
 
         reset () {
             EscapeHelper._stop = false;
+        },
+
+        async tryOneoffEscape () {
+            if (CombatStatus.inProgress()) {
+                let retry = new Retry();
+                retry.initialize(function escape () {
+                    ButtonManager.click('escape');
+                }, CombatStatus.justFinished);
+
+                await retry.fire();
+            }
         }
     };
 
@@ -4782,36 +4819,6 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '调试',
-            title: '当调试模式开启，浏览器控制台会输出更详细的日志，方便追踪问题。',
-            id: 'id-debugging',
-            width: '60px',
-            marginRight: '1px',
-
-            eventOnClick () {
-                System.debugMode = ButtonManager.simpleToggleButtonEvent(this);
-            }
-        }, {
-            label: '.',
-            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.getDebugMessageBlacklist(),
-            width: '10px',
-            id: 'id-debugging-setting',
-
-            async eventOnClick () {
-                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.getDebugMessageBlacklist());
-                if (answer || answer === '') {
-                    System.setDebugMessageBlacklist(answer);
-                }
-            }
-        }, {
-            label: '当前监听',
-            title: '日志输出当前监听器信息以供调试...',
-
-            async eventOnClick () {
-                log('当前监听', InterceptorRegistry.getInterceptors());
-            }
-        }, {
-        }, {
             label: '飞地图',
             title: '跑地图...',
             hidden: true,
@@ -4998,6 +5005,36 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '调试',
+            title: '当调试模式开启，浏览器控制台会输出更详细的日志，方便追踪问题。',
+            id: 'id-debugging',
+            width: '60px',
+            marginRight: '1px',
+
+            eventOnClick () {
+                System.debugMode = ButtonManager.simpleToggleButtonEvent(this);
+            }
+        }, {
+            label: '.',
+            title: '设置系统消息屏蔽，目前只支持 type|subtype 级别。当前设定为 ' + System.getDebugMessageBlacklist(),
+            width: '10px',
+            id: 'id-debugging-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入 type|subtype 组合，以半角逗号隔开。比如 channel|rumor,attrs_change', System.getDebugMessageBlacklist());
+                if (answer || answer === '') {
+                    System.setDebugMessageBlacklist(answer);
+                }
+            }
+        }, {
+            label: '当前监听',
+            title: '日志输出当前监听器信息以供调试...',
+
+            async eventOnClick () {
+                log('当前监听', InterceptorRegistry.getInterceptors());
+            }
+        }, {
+        }, {
             label: '检测状态',
             title: '自动检测状态...',
             id: 'id-auto-status-reset',
@@ -5032,17 +5069,11 @@ window.setTimeout(function () {
         buttons: [{
             label: '一键回家',
             title: '紧急情况下点此按钮可以一键回家，无需任何确认步骤。',
+            id: 'id-home',
             backgroundColor: 'rgba(150,250,100,0.8)',
 
             async eventOnClick () {
-                if (CombatStatus.inProgress()) {
-                    let retry = new Retry();
-                    retry.initialize(function escape () {
-                        ButtonManager.click('escape');
-                    }, CombatStatus.justFinished);
-
-                    await retry.fire();
-                }
+                await EscapeHelper.tryOneoffEscape();
 
                 if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead()) {
                     TeamworkHelper.Navigation.notifyTeamWithPath('回家', 'home');
@@ -5254,7 +5285,7 @@ window.setTimeout(function () {
             width: '38px',
             marginRight: '1px',
 
-            eventOnClick () {
+            async eventOnClick () {
                 let commands;
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     commands = [
@@ -5289,8 +5320,8 @@ window.setTimeout(function () {
                     ].join(';');
                 }
 
-                ButtonManager.click(commands);
-                ButtonManager.click('auto_fight 0;enforce ' + User.attributes.getMaxEnforce());
+                await ButtonManager.click(commands);
+                await ButtonManager.click('auto_fight 0;enforce ' + User.attributes.getMaxEnforce());
             }
         }, {
             label: '学',
@@ -5582,7 +5613,7 @@ window.setTimeout(function () {
         }, {
             label: '题',
             title: '高亮答案且自动答题，题库中如果找不到答案将停止...',
-            id: 'btnQuizzesHelper',
+            id: 'id-quizzes-helper',
             width: '38px',
             marginRight: '1px',
 
@@ -5622,8 +5653,14 @@ window.setTimeout(function () {
             title: '一键从任意处到大昭壁画所在地面壁...',
             width: '38px',
 
-            eventOnClick () {
-                Navigation.move('jh 26;w;w;n;w;w;w;n;n;e;event_1_12853448');
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this) && window.confirm('寻找壁画路径是动态的所以耗时看脸，确定开始？')) {
+                    await FrescoHelper.startTrying();
+                } else {
+                    FrescoHelper.stopTrying();
+                }
+
+                ButtonManager.resetButtonById(this.id);
             }
         }, {
         }, {
@@ -5970,7 +6007,7 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '自动打',
+            label: '开打',
             title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...\n\n注意：\n队长专属功能，队员可以不用设置。',
             id: 'id-forest-killer',
             width: '60px',
@@ -6167,7 +6204,7 @@ window.setTimeout(function () {
                     await ButtonManager.click('enforce 0');
                     this.innerText = '恢复加力';
                     this.style.color = 'red';
-                    this.title = '点击可开启当前最大加力' + User.attributes.getMaxEnforce();
+                    this.title = '点击可开启当前最大加力';
                 } else {
                     await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
                     this.innerText = '取消加力';
@@ -6794,6 +6831,8 @@ window.setTimeout(function () {
         }
     };
 
+    User.initialize();
+
     function inintializeHelpButtons (conf) {
         HelperUiManager.loadConfigurations(conf);
         HelperUiManager.drawFunctionalGroups();
@@ -6807,8 +6846,6 @@ window.setTimeout(function () {
     }
 
     inintializeHelpButtons(helperConfigurations);
-
-    User.initialize();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (messagePack) {
@@ -6827,4 +6864,4 @@ window.setTimeout(function () {
 
     log('脚本加载完毕。');
     System.scriptLoaded = true;
-}, 2000);
+}, 1000);
