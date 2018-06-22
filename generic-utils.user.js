@@ -5044,7 +5044,11 @@ window.setTimeout(function () {
                     await retry.fire();
                 }
 
-                ButtonManager.click('home');
+                if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead()) {
+                    TeamworkHelper.Navigation.notifyTeamWithPath('回家', 'home');
+                }
+
+                Navigation.move('home');
             }
         }, {
             label: '一键跨服',
