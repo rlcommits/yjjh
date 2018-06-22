@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.38
+// @version      2.1.39
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5007,6 +5007,15 @@ window.setTimeout(function () {
             backgroundColor: 'rgba(150,250,100,0.8)',
 
             async eventOnClick () {
+                if (CombatStatus.inProgress()) {
+                    let retry = new Retry();
+                    retry.initialize(function escape () {
+                        ButtonManager.click('escape');
+                    }, CombatStatus.justFinished);
+
+                    await retry.fire();
+                }
+
                 ButtonManager.click('home');
             }
         }, {
