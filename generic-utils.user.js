@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.41
+// @version      2.1.42
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1449,7 +1449,7 @@ window.setTimeout(function () {
             },
 
             identifyTeamLeadName (teamLeadName) {
-                let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`, ${teamLeadName}, `));
+                let targetUser = System.globalObjectMap.get('msg_friend').elements.filter(v => v['value'].includes(`,${teamLeadName},`));
                 if (targetUser.length) {
                     let userInfo = targetUser[0]['value'].split(',');
 
