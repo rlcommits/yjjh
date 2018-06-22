@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.37
+// @version      2.1.38
+// @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
@@ -53,6 +54,7 @@ window.setTimeout(function () {
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
         debugMode: false,
+        scriptLoaded: false,
 
         _uid: '',
         _automatedReconnect: false,
@@ -124,7 +126,7 @@ window.setTimeout(function () {
 
         async refreshPageIfConnectionDropped () {
             if (!window.unsafeWindow.sock) {
-                System.saveLastButtonStatus();
+                System.saveCurrentButtonStatus();
                 await ExecutionManager.wait(2000);
 
                 window.unsafeWindow.location.reload();
@@ -135,24 +137,28 @@ window.setTimeout(function () {
             let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
             log('读取上次激活的按钮...', ids);
 
-            log('is array: ', Array.isArray(ids));
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
-                    log(`ids[${i}]=` + ids[i]);
-                    ButtonManager.pressDown(ids[i]);
+                    if (ids[i] && ids[i] !== 'id-goto-another-world') {
+                        debugging(`ids[${i}]=` + ids[i]);
+                        ButtonManager.pressDown(ids[i]);
+                    }
                 }
             }
         },
 
-        saveLastButtonStatus () {
+        saveCurrentButtonStatus () {
+            if (!System.scriptLoaded) return;
+            if (!System.isLocalServer()) return;
+
             let ids = [];
             $('button').filter(function () {
                 return $(this).text().includes('x');
             }).each(function () {
-                ids.push($(this).attr('id'));
+                if ($(this).attr('id') && $(this).attr('id') !== 'id-goto-another-world') ids.push($(this).attr('id'));
             });
 
-            log('保存当前激活的按钮', ids);
+            debugging('保存当前激活的按钮', ids);
             System.setVariant(System.keys.LAST_ACTIVE_BUTTON_IDS, ids);
         }
     };
@@ -512,7 +518,7 @@ window.setTimeout(function () {
         }
     };
 
-    var InterceptorFactory = {
+    var InterceptorRegistry = {
         _interceptors: [],
 
         register (interceptor) {
@@ -529,17 +535,14 @@ window.setTimeout(function () {
     };
 
     class Interceptor {
-        constructor (alias) {
+        constructor (alias, criterial, behavior) {
             this._alias = alias;
+            this._criterial = criterial;
+            this._behavior = behavior;
         }
 
         getAlias () {
             return this._alias;
-        }
-
-        initialize (criterial, behavior) {
-            this._criterial = criterial;
-            this._behavior = behavior;
         }
 
         handle (message) {
@@ -551,7 +554,7 @@ window.setTimeout(function () {
         }
     };
 
-    class TaskV2 {
+    class Task {
         constructor (text) {
             this._text = text;
 
@@ -690,25 +693,25 @@ window.setTimeout(function () {
         },
 
         turnOnClanTaskListener () {
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask));
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask));
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton));
+            InterceptorRegistry.register(new Interceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask));
+            InterceptorRegistry.register(new Interceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask));
+            InterceptorRegistry.register(new Interceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton));
         },
 
         turnOnMasterTaskListener () {
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask));
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask));
-            InterceptorFactory.register(GenericTaskManager._createInterceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton));
+            InterceptorRegistry.register(new Interceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask));
+            InterceptorRegistry.register(new Interceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask));
+            InterceptorRegistry.register(new Interceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton));
         },
 
         turnOffClanTaskListener () {
-            InterceptorFactory.unregister('帮派申请任务');
-            InterceptorFactory.unregister('帮派自动继续任务');
+            InterceptorRegistry.unregister('帮派申请任务');
+            InterceptorRegistry.unregister('帮派自动继续任务');
         },
 
         turnOffMasterTaskListener () {
-            InterceptorFactory.unregister('师门申请任务');
-            InterceptorFactory.unregister('师门自动继续任务');
+            InterceptorRegistry.unregister('师门申请任务');
+            InterceptorRegistry.unregister('师门自动继续任务');
         },
 
         newClanTaskArrived (message) {
@@ -720,12 +723,12 @@ window.setTimeout(function () {
         },
 
         async addressClanTask (message) {
-            await new TaskV2(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await new Task(System.replaceControlCharBlank(message.get('msg'))).resolve();
             await Navigation.move('clan;scene;clan submit_task');
         },
 
         async addressMasterTask (message) {
-            await new TaskV2(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await new Task(System.replaceControlCharBlank(message.get('msg'))).resolve();
             await Navigation.move('go_family');
             let link = await Panels.Family.getActionLink('交任务');
             await ExecutionManager.asyncExecute(link);
@@ -770,13 +773,6 @@ window.setTimeout(function () {
             }
 
             return false;
-        },
-
-        _createInterceptor (alias, criterial, behavior) {
-            let interceptor = new Interceptor(alias);
-            interceptor.initialize(criterial, behavior);
-
-            return interceptor;
         }
     };
 
@@ -1292,62 +1288,24 @@ window.setTimeout(function () {
         }
     };
 
-    class TeamworkCommandParser {
-        constructor (messageWithColor) {
-            this._message = System.replaceControlCharBlank(messageWithColor);
-        }
-
-        isCommandValid () {
-            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。')) return true;
-
-            if (!this._message.includes(TeamworkHelper.Constructure.getTeamLeadName())) return;
-            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
-            if (this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
-            if (this._message.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`)) return true;
-
-            debugging('不是一个行动命令。');
-        }
-
-        action () {
-            debugging('判定团队行动：' + this._message);
-
-            let matches = null;
-            if (this._message.includes('走一步') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
-                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
-                Navigation.move(new Direction(matches[2]).getCode());
-            } else if (this._message.includes('杀死') || this._message.includes('比试')) {
-                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。');
-                TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
-            } else if (this._message.includes('出发前往') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
-                matches = this._message.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。');
-                TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
-                if (PathManager.getPathForSpecificEvent(matches[2])) {
-                    Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
-                } else {
-                    debugging('没有匹配到合适的出发处理规则。', matches);
-                }
-            } else if (this._message.includes('全体注意，目标') && this._message.includes('路径') && TeamworkHelper.Navigation.isMovingWithTeamleadActive()) {
-                matches = this._message.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`);
-                TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
-                Navigation.move(matches[3].replace(/%/g, ' '));
-            }
-        }
-    };
-
     var TeamworkHelper = {
         _autoKill: false,
-        _acceptAnyJoinRequest: false,
         _teamworkModeOn: false,
-        _moveWithTeamLead: false,
 
-        startTeamworkMode (acceptAnyTeamJoinRequest = false) {
+        turnOnJoinRequestAutomatedApproval () {
+            InterceptorRegistry.register(new Interceptor('自动批准组队申请', TeamworkHelper.Constructure.joinRequestArrives, TeamworkHelper.Constructure.approveJoinRequest));
+        },
+
+        turnOffJoinRequestAutomatedApproval () {
+            InterceptorRegistry.unregister('自动批准组队申请');
+        },
+
+        startTeamworkMode () {
             TeamworkHelper._teamworkModeOn = true;
-            TeamworkHelper._acceptAnyJoinRequest = acceptAnyTeamJoinRequest;
         },
 
         stopTeamworkMode () {
             TeamworkHelper._teamworkModeOn = false;
-            TeamworkHelper._acceptAnyJoinRequest = false;
         },
 
         isTeamworkModeOn () {
@@ -1365,19 +1323,31 @@ window.setTimeout(function () {
         },
 
         Combat: {
-            _isFollowingBattleActive: false,
             _isFollowingEscapeActive: false,
 
-            isFollowingBattleActive () {
-                return TeamworkHelper.Combat._isFollowingBattleActive;
-            },
-
             startFollowingBattle () {
-                TeamworkHelper.Combat._isFollowingBattleActive = true;
+                InterceptorRegistry.register(new Interceptor('监听群殴指令', TeamworkHelper.Combat.newFightCommandArrives, TeamworkHelper.Combat.fightTogether));
             },
 
             stopFollowingBattle () {
-                TeamworkHelper.Combat._isFollowingBattleActive = false;
+                InterceptorRegistry.unregister('监听群殴指令');
+            },
+
+            newFightCommandArrives (message) {
+                if (message.get('type') === 'channel' && message.get('subtype') === 'team') {
+                    let text = System.replaceControlCharBlank(message.get('msg'));
+                    return text.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。');
+                }
+            },
+
+            fightTogether (message) {
+                debugging('判定团队战斗指令：', message);
+
+                let text = System.replaceControlCharBlank(message.get('msg'));
+                if (text.includes('杀死') || text.includes('比试')) {
+                    let matches = text.match('^href;0;team【队伍】(.*?)：全体注意，(杀死|比试)(.*?)。');
+                    TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
+                }
             },
 
             isFollowingEscapeActive () {
@@ -1476,20 +1446,61 @@ window.setTimeout(function () {
 
             getTeamLeadId () {
                 return System.getVariant(System.keys.TEAMWORK_LEAD_ID);
+            },
+
+            joinRequestArrives (message) {
+                if (message.get('type') === 'prompt') {
+                    return message.get('msg').includes('想要加入你的队伍。');
+                }
+            },
+
+            approveJoinRequest (message) {
+                ButtonManager.click(message.get('cmd1'), 0);
+                ButtonManager.click('prev;prev');
             }
         },
 
         Navigation: {
-            startMovingWithTeamlead () {
-                TeamworkHelper._moveWithTeamLead = true;
+            turnOnTeamMoving () {
+                InterceptorRegistry.register(new Interceptor('跟队长移动', TeamworkHelper.Navigation.newCommandArrives, TeamworkHelper.Navigation.moveWithTeamLead));
             },
 
-            stopMovingWithTeamlead () {
-                TeamworkHelper._moveWithTeamLead = false;
+            turnOffTeamMoving () {
+                InterceptorRegistry.unregister('跟队长移动');
             },
 
-            isMovingWithTeamleadActive () {
-                return TeamworkHelper._moveWithTeamLead;
+            newCommandArrives (message) {
+                if (message.get('type') === 'channel' && message.get('subtype') === 'team') {
+                    let text = System.replaceControlCharBlank(message.get('msg'));
+                    if (!text.includes(TeamworkHelper.Constructure.getTeamLeadName())) return false;
+
+                    if (text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
+                    if (text.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
+                    if (text.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`)) return true;
+                }
+            },
+
+            moveWithTeamLead (message) {
+                debugging('判定团队移动行为...');
+
+                let text = System.replaceControlCharBlank(message.get('msg'));
+                let matches = null;
+                if (text.includes('走一步')) {
+                    matches = text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
+                    Navigation.move(new Direction(matches[2]).getCode());
+                } else if (text.includes('出发前往')) {
+                    matches = text.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。');
+                    TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
+                    if (PathManager.getPathForSpecificEvent(matches[2])) {
+                        Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
+                    } else {
+                        debugging('没有匹配到合适的出发处理规则。', matches);
+                    }
+                } else if (text.includes('全体注意，目标') && text.includes('路径')) {
+                    matches = text.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`);
+                    TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
+                    Navigation.move(matches[3].replace(/%/g, ' '));
+                }
             },
 
             async goto (event) {
@@ -3184,12 +3195,14 @@ window.setTimeout(function () {
                 button.innerText = button.name;
                 button.style.color = '';
 
+                System.saveCurrentButtonStatus();
                 return false;
             } else {
                 debugging('switching to simple toggle mode');
                 button.innerText = toggleLabel || 'x ' + button.name;
                 button.style.color = 'red';
 
+                System.saveCurrentButtonStatus();
                 return true;
             }
         },
@@ -3200,12 +3213,14 @@ window.setTimeout(function () {
                 button.innerText = toggleLabel.getText();
                 button.style.color = toggleLabel.getColor();
 
+                System.saveCurrentButtonStatus();
                 return true;
             } else {
                 debugging('revert from toggle mode');
                 button.innerText = defaultLabel.getText();
                 button.style.color = defaultLabel.getColor();
 
+                System.saveCurrentButtonStatus();
                 return false;
             }
         },
@@ -3223,6 +3238,8 @@ window.setTimeout(function () {
         pressDown (buttonId) {
             let button = buttonId.includes('#') ? $(buttonId) : $('#' + buttonId);
             if (button.css('color') === 'rgb(0, 0, 0)') button.click();
+
+            System.saveCurrentButtonStatus();
         },
 
         getButtonOnclickLink (action) {
@@ -3552,8 +3569,7 @@ window.setTimeout(function () {
             if (!MessageListener._enabled) return false;
 
             return DragonMonitor.isActive() ||
-                TeamworkHelper.isTeamworkModeOn() ||
-                TeamworkHelper.isAnyTeamJoinRequestAccpted();
+                TeamworkHelper.isTeamworkModeOn();
         },
 
         isMessageInRejectList (messagePack) {
@@ -3604,16 +3620,6 @@ window.setTimeout(function () {
                     }
 
                     break;
-                case 'prompt':
-                    if (TeamworkHelper.isAnyTeamJoinRequestAccpted() && this._messagePack.get('msg').includes('想要加入你的队伍。')) {
-                        let msgTeam = System.globalObjectMap.get('msg_team');
-                        if (msgTeam.get('member_num') === msgTeam.get('max_member_num')) return;
-
-                        ButtonManager.click(this._messagePack.get('cmd1'), 0);
-                        ButtonManager.click('prev;prev');
-                    }
-
-                    break;
                 case 'vs':
                     if (this._messagePack.get('subtype') === 'text') {
                         if (!message) return;
@@ -3626,15 +3632,6 @@ window.setTimeout(function () {
                     }
 
                     break;
-                case 'channel':
-                    if (this._messagePack.get('subtype') === 'team') {
-                        let command = new TeamworkCommandParser(message);
-                        if (command.isCommandValid()) {
-                            command.action();
-                        }
-                    }
-
-                    break;
                 case 'die':
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     if (System.isLocalServer() && document.title.includes('跨服')) {
@@ -3643,7 +3640,7 @@ window.setTimeout(function () {
 
                     break;
                 case 'disconnect':
-                    log('检测到掉线，检查是否有设置断线重连...');
+                    log('检测到掉线，检查是否有设置断线重连...\n\n注意：\n慎用，本功能有可能造成互相顶号无限循环...');
                     if (System.isAutomatedReconnectRequired()) {
                         log('检测到断线重连设置，等待 60 秒后重刷页面...');
                         if (!System.isLocalServer()) {
@@ -4806,7 +4803,7 @@ window.setTimeout(function () {
             title: '日志输出当前监听器信息以供调试...',
 
             async eventOnClick () {
-                log('当前监听', InterceptorFactory.getInterceptors());
+                log('当前监听', InterceptorRegistry.getInterceptors());
             }
         }, {
         }, {
@@ -5258,6 +5255,7 @@ window.setTimeout(function () {
             label: '学',
             title: '切换到悟性最高的装备...\n\n1. 风泉之剑 (+10)\n2. 迷幻经纶 (+3)\n3. 龙渊扳指(+3)',
             width: '38px',
+            id: 'id-equipment-for-study',
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -5553,6 +5551,7 @@ window.setTimeout(function () {
                     QuizzesHelper.answer();
                 } else {
                     QuizzesHelper.stop();
+                    ButtonManager.resetButtonById(this.id);
                 }
             }
         }, {
@@ -6239,12 +6238,16 @@ window.setTimeout(function () {
                     ButtonManager.pressDown('id-recover-hp-mp');
                     ButtonManager.pressDown('id-auto-follower-fight');
 
-                    TeamworkHelper.startTeamworkMode(true);
+                    TeamworkHelper.startTeamworkMode();
+
+                    TeamworkHelper.turnOnJoinRequestAutomatedApproval();
                 } else {
                     TeamworkHelper.stopTeamworkMode();
 
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     ButtonManager.resetButtonById('id-auto-follower-fight');
+
+                    TeamworkHelper.turnOffJoinRequestAutomatedApproval();
                 }
             }
         }, {
@@ -6261,7 +6264,7 @@ window.setTimeout(function () {
                     ButtonManager.pressDown('id-auto-follower-fight');
                     ButtonManager.pressDown('id-follow-team-lead');
 
-                    TeamworkHelper.startTeamworkMode(false);
+                    TeamworkHelper.startTeamworkMode();
                 } else {
                     TeamworkHelper.stopTeamworkMode();
 
@@ -6304,9 +6307,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    TeamworkHelper.Navigation.startMovingWithTeamlead();
+                    TeamworkHelper.Navigation.turnOnTeamMoving();
                 } else {
-                    TeamworkHelper.Navigation.stopMovingWithTeamlead();
+                    TeamworkHelper.Navigation.turnOffTeamMoving();
                 }
             }
         }, {
@@ -6774,10 +6777,13 @@ window.setTimeout(function () {
             new MessageDispatcher(messagePack).dispatch();
         }
 
-        InterceptorFactory.getInterceptors().forEach(v => v.handle(messagePack));
+        InterceptorRegistry.getInterceptors().forEach(v => v.handle(messagePack));
 
         if (MessageListener.isWorking() && !MessageListener.isMessageInLoggingRejectedList(messagePack)) {
             debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
         }
     };
-}, 1000);
+
+    log('脚本加载完毕。');
+    System.scriptLoaded = true;
+}, 2000);
