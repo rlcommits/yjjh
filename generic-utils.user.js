@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.49
+// @version      2.1.50
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1918,20 +1918,18 @@ window.setTimeout(function () {
         }
 
         async fire () {
-            debugging('BodySearch::fire:event fired, this._stop=' + this._stop);
-
             if (CombatStatus.justFinished()) {
                 await ButtonManager.click('prev_combat');
                 await this.identifyCandidates();
             }
 
             if (this._stop || (this._candidates.length === 0 && !CombatStatus.inProgress())) {
-                debugging('search done.');
+                debugging('搜身结束。');
                 ButtonManager.resetButtonById('id-body-search');
                 await Objects.Room.refresh();
                 return true;
             } else {
-                debugging('BodySearch::fire:candidates size=' + this._candidates.length);
+                debugging('可以搜身的目标个数：' + this._candidates.length);
                 let start = new Date();
 
                 for (let i = this._candidates.length - 1; i >= 0; i--) {
@@ -1964,7 +1962,7 @@ window.setTimeout(function () {
                     await ButtonManager.click(`look_item ${itemId}`);
 
                     if ($('span.out').text().includes('里面有：')) {
-                        debugging(`nothing left in ${itemId}`);
+                        debugging(`没有剩余物品在 ${itemId}`);
                         stop = false;
                     }
                 }
@@ -3124,7 +3122,7 @@ window.setTimeout(function () {
             if (npcs.length) {
                 let combat = new Combat(200, false, !GenericMapCleaner._maxEnforce);
                 combat.initialize(npcs[0], '杀死');
-                if (GenericMapCleaner._bodySearch) $('#id-body-search').click();
+                if (GenericMapCleaner._bodySearch) ButtonManager.pressDown('id-body-search');
 
                 await combat.fire();
                 await ExecutionManager.wait(GenericMapCleaner._intervalForBreak);
@@ -6021,7 +6019,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
-                        GenericMapCleaner.initialize(false, [], 300, new RegexExpressionFilter(), true, false);
+                        GenericMapCleaner.initialize(false, [], 1000, new RegexExpressionFilter(), true, false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
