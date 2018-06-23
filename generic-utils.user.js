@@ -1741,7 +1741,7 @@ window.setTimeout(function () {
                 log('没有需要对话的奇侠。');
             }
 
-            ButtonManager.resetButtonById('id-fruits');
+            ButtonManager.resetButtonById('id-fruits-stateless');
 
             async function talkToKnights (candidates) {
                 log('开始对话奇侠...');
@@ -4726,21 +4726,21 @@ window.setTimeout(function () {
 
     JobManager.register('id-fishing', 7000, FishingManager.fire);
     JobManager.register('id-killer', 200, KillerHelper.fire);
-    JobManager.register('id-credits-tickets', 1000 * 60 * 60 * 2, CreditTicketManager.fire);
-    JobManager.register('id-works', 1000 * 60 * 60 * 1, DailyWorksManager.fire);
+    JobManager.register('id-credits-tickets-stateless', 1000 * 60 * 60 * 2, CreditTicketManager.fire);
+    JobManager.register('id-works-stateless', 1000 * 60 * 60 * 1, DailyWorksManager.fire);
     JobManager.register('id-idle-checker', 1000 * 60 * 5, IdleChecker.fire);
     JobManager.register('id-leftover-tasks', 1000 * 60, LeftoverChecker.fire);
 
     JobManager.register('id-escape', 200, EscapeHelper.escape);
-    JobManager.register('id-repeater', 200, Repeater.fire);
+    JobManager.register('id-repeater-stateless', 200, Repeater.fire);
 
     var helperConfigurations = [{
         subject: '其他项目',
 
         buttons: [{
             label: '积分礼券',
-            title: '每 ' + JobManager.getJob('id-credits-tickets').getInterval() / (1000 * 60 * 60) + ' 小时检查一次李火狮消费积分，谜题卡，狗年礼券\n\n注意：周一凌晨多领一次礼物功能已经挪到 "自动点完任务" 功能。',
-            id: 'id-credits-tickets',
+            title: '每 ' + JobManager.getJob('id-credits-tickets-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次李火狮消费积分，谜题卡，狗年礼券\n\n注意：周一凌晨多领一次礼物功能已经挪到 "自动点完任务" 功能。',
+            id: 'id-credits-tickets-stateless',
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -4755,8 +4755,8 @@ window.setTimeout(function () {
             }
         }, {
             label: '磕头端茶',
-            title: '每 ' + JobManager.getJob('id-works').getInterval() / (1000 * 60 * 60) + ' 小时检查一次端茶倒水擂台等工作。',
-            id: 'id-works',
+            title: '每 ' + JobManager.getJob('id-works-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次端茶倒水擂台等工作。',
+            id: 'id-works-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -4891,23 +4891,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '一直重复',
-            title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
-            id: 'id-repeater',
-            hidden: true,
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (Repeater.confirmAction()) {
-                        JobManager.getJob(this.id).start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
-                } else {
-                    JobManager.getJob(this.id).stop();
-                }
-            }
-        }, {
         }, {
             label: '抢杀',
             title: '抢杀某个指定目标...',
@@ -4982,7 +4965,7 @@ window.setTimeout(function () {
         }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
-            id: 'id-repeater',
+            id: 'id-repeater-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -5346,7 +5329,7 @@ window.setTimeout(function () {
         }, {
             label: '开打',
             title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...\n\n注意：\n队长专属功能，队员可以不用设置。',
-            id: 'id-forest-killer',
+            id: 'id-forest-killer-stateless',
             width: '60px',
             marginRight: '1px',
 
@@ -5381,7 +5364,7 @@ window.setTimeout(function () {
             label: '.',
             title: '设置森林入口路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
             width: '10px',
-            id: 'id-forest-killer-setting',
+            id: 'id-forest-killer-stateless-setting',
 
             async eventOnClick () {
                 let answer = window.prompt('请按格式指定森林里扫荡的起点和开打的实际路径（语法需严格遵守要求）：\n\n例子：' + ForestHelper.getTraversalPath(), ForestHelper.getTraversalPath());
@@ -6043,7 +6026,7 @@ window.setTimeout(function () {
         }, {
             label: '清秘境',
             title: '叫杀当前秘境地图的所有 npc，随机寻找路径，战斗结束后自动搜身...',
-            id: 'id-secure-map-cleaner',
+            id: 'id-secure-map-cleaner-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -6087,7 +6070,7 @@ window.setTimeout(function () {
         }, {
             label: '一键果子',
             title: '自动按最优策略依次对话奇侠拿果子\n\n注意：\n1. 每天20次的撩奇侠请自行先解决，否则相当于浪费20次机会。\n2. 本版本针对未出师的奇侠会跳出提示跳过或取消当前轮。\n3. 当前策略：先筛选好感度达到 25000 的游侠，按好感度从低到高对话，剩余奇侠按好感度从高到低依次对话。',
-            id: 'id-fruits',
+            id: 'id-fruits-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
