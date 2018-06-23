@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.48
+// @version      2.1.49
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -183,8 +183,6 @@ window.setTimeout(function () {
 
             await analyseEnforce();
             await Objects.Room.refresh();
-
-            document.title = User.getName();
 
             logCurrentSettings();
 
@@ -547,11 +545,13 @@ window.setTimeout(function () {
         _interceptors: [],
 
         register (interceptor) {
+            log('注册拦截器：' + interceptor.getAlias());
             this._interceptors.push(interceptor);
         },
 
         unregister (alias) {
-            this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)));
+            log('注销拦截器：' + alias);
+            this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)), 1);
         },
 
         getInterceptors () {
@@ -1471,9 +1471,11 @@ window.setTimeout(function () {
 
         Constructure: {
             async createTeamIfNeeded () {
+                if (!System.scriptLoaded) return;
+
                 if (!System.globalObjectMap.get('msg_team').get('team_id')) {
                     if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
-                        ButtonManager.resetButtonById('id-team-lead-stateless');
+                        ButtonManager.resetButtonById('id-team-lead');
                         return;
                     }
 
@@ -6363,7 +6365,7 @@ window.setTimeout(function () {
         }, {
             label: '将',
             title: '队长模式\n\n注意：\n1. 开启本模式会自动激活群殴相关功能\n2. 开启本模式会监听组队请求并自动批准',
-            id: 'id-team-lead-stateless',
+            id: 'id-team-lead',
             width: '38px',
             marginRight: '1px',
 
@@ -6371,9 +6373,9 @@ window.setTimeout(function () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     await TeamworkHelper.Constructure.createTeamIfNeeded();
 
-                    ButtonManager.resetButtonById('id-team-member-stateless');
+                    ButtonManager.resetButtonById('id-team-member');
                     ButtonManager.pressDown('id-recover-hp-mp');
-                    ButtonManager.pressDown('id-auto-follower-fight-stateless');
+                    ButtonManager.pressDown('id-auto-follower-fight');
 
                     TeamworkHelper.startTeamworkMode();
 
@@ -6382,7 +6384,7 @@ window.setTimeout(function () {
                     TeamworkHelper.stopTeamworkMode();
 
                     ButtonManager.resetButtonById('id-recover-hp-mp');
-                    ButtonManager.resetButtonById('id-auto-follower-fight-stateless');
+                    ButtonManager.resetButtonById('id-auto-follower-fight');
 
                     TeamworkHelper.turnOffJoinRequestAutomatedApproval();
                 }
@@ -6390,15 +6392,15 @@ window.setTimeout(function () {
         }, {
             label: '兵',
             title: '队员模式',
-            id: 'id-team-member-stateless',
+            id: 'id-team-member',
             width: '38px',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    ButtonManager.resetButtonById('id-team-lead-stateless');
+                    ButtonManager.resetButtonById('id-team-lead');
 
                     ButtonManager.pressDown('id-recover-hp-mp');
-                    ButtonManager.pressDown('id-auto-follower-fight-stateless');
+                    ButtonManager.pressDown('id-auto-follower-fight');
                     ButtonManager.pressDown('id-follow-team-lead');
 
                     TeamworkHelper.startTeamworkMode();
@@ -6406,14 +6408,14 @@ window.setTimeout(function () {
                     TeamworkHelper.stopTeamworkMode();
 
                     ButtonManager.resetButtonById('id-recover-hp-mp');
-                    ButtonManager.resetButtonById('id-auto-follower-fight-stateless');
+                    ButtonManager.resetButtonById('id-auto-follower-fight');
                     ButtonManager.resetButtonById('id-follow-team-lead');
                 }
             }
         }, {
             label: '群',
             title: '同组队员比试跟着比试，同组队员叫杀跟着叫杀...\n\n注意：\n1. 必须组队，脚本自动判断同组队员和战斗对象\n2. 只能跟随同一场景的其他队员叫杀或者比试',
-            id: 'id-auto-follower-fight-stateless',
+            id: 'id-auto-follower-fight',
             width: '38px',
             marginRight: '1px',
 
@@ -6427,7 +6429,7 @@ window.setTimeout(function () {
         }, {
             label: '撤',
             title: '同伙撤退跟着撤退...\n\n注意：\n1. 必须组队\n2. 脚本自动判断其他队员名字和逃跑动作\n3. 其他任意一个队员成功逃跑时跟着逃',
-            id: 'id-auto-follower-escape-stateless',
+            id: 'id-auto-follower-escape',
             width: '38px',
 
             async eventOnClick () {
@@ -6921,4 +6923,5 @@ window.setTimeout(function () {
 
     log('脚本加载完毕。');
     System.scriptLoaded = true;
+    document.title = User.getName();
 }, 1000);
