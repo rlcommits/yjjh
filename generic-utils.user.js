@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.57
+// @version      2.1.58
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3451,8 +3451,12 @@ window.setTimeout(function () {
                     DragonMonitor.turnOnDragonHandler();
 
                     if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
-                } else if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
-                    log('不关心的目标：' + DragonMonitor._dragon.getBonus());
+                } else {
+                    if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
+                        log('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
+                    } else {
+                        log('没有关注的目标：' + DragonMonitor._dragon.getBonus());
+                    }
 
                     DragonMonitor.turnOnDragonEventListener();
                 }
