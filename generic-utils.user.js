@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.45
+// @version      2.1.46
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3072,14 +3072,16 @@ window.setTimeout(function () {
         _intervalForBreak: 2500,
         _regexExpressionFilter: new RegexExpressionFilter(),
         _bodySearch: false,
+        _maxEnforce: true,
 
-        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false) {
+        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true) {
             GenericMapCleaner._stop = false;
             GenericMapCleaner._travelsalByGivenPath = travelsalByGivenPath;
             GenericMapCleaner._path = path;
             GenericMapCleaner._intervalForBreak = intervalForBreak;
             GenericMapCleaner._regexExpressionFilter = regexExpressionFilter;
             GenericMapCleaner._bodySearch = bodySearch;
+            GenericMapCleaner._maxEnforce = maxEnforce;
 
             GenericMapCleaner._retry.initialize(GenericMapCleaner._killAndMove, function stopWhen () {
                 return GenericMapCleaner._stop;
@@ -3089,7 +3091,7 @@ window.setTimeout(function () {
         async _killAndMove () {
             let npcs = GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter);
             if (npcs.length) {
-                let combat = new Combat();
+                let combat = new Combat(200, false, !GenericMapCleaner._maxEnforce);
                 combat.initialize(npcs[0], '杀死');
                 if (GenericMapCleaner._bodySearch) $('#id-body-search').click();
 
@@ -3433,8 +3435,8 @@ window.setTimeout(function () {
             DragonMonitor.turnOnDragonEventListener();
 
             async function fire (message) {
-                let npcs = locateRoomInformation(DragonMonitor._dragon, message);
-                let npc = await locateTargetNpc(npcs);
+                let npcs = DragonHelper.locateRoomInformation(DragonMonitor._dragon, message);
+                let npc = await DragonHelper.locateTargetNpc(npcs);
                 if (npc) {
                     let regMatch = DragonMonitor.getRegKeywords();
                     if (regMatch && DragonMonitor._dragon.getBonus().match(regMatch)) {
@@ -3447,28 +3449,6 @@ window.setTimeout(function () {
                 }
 
                 await Navigation.move('escape;prev;home');
-
-                function locateRoomInformation (dragon, message) {
-                    let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : dragon.getGood();
-                    debugging('目标关键字：' + target);
-                    let npcs = Objects.Room.getNpcsByMessage(message, target);
-                    debugging('在场 npcs: ', npcs);
-                    debugging('在场玩家：', null, DragonHelper.getUserList);
-                    debugging('在场符合条件的 npc:', npcs);
-
-                    return npcs;
-                }
-
-                async function locateTargetNpc (npcs) {
-                    if (npcs.length === 1) return npcs[0];
-
-                    for (let i = 0; i < npcs.length; i++) {
-                        await Objects.Npc.action(npcs[i], '观战');
-                        await ExecutionManager.wait(100);
-
-                        if (DragonHelper.isTarget(npcs[i])) return npcs[i];
-                    }
-                }
             }
         },
 
@@ -3600,43 +3580,6 @@ window.setTimeout(function () {
             return event.match(DragonMonitor._REG_DRAGON_APPERS);
         },
 
-        async locateRoomInformation (dragon) {
-            await ExecutionManager.wait(100);
-
-            let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : dragon.getGood();
-            debugging('目标关键字：' + target);
-            debugging('在场 npc: ', null, Objects.Room.getAvailableNpcs);
-            let npcs = Objects.Room.getAvailableNpcsV2(target, true);
-            debugging('在场玩家：', null, DragonHelper.getUserList);
-            debugging('在场符合条件的 npc:', npcs);
-
-            let start = new Date().getTime();
-            while (!npcs.length) {
-                debugging('npc 信息未刷新，等待');
-                await ExecutionManager.wait(100);
-
-                debugging('等待结束，重新刷新检测 - ', null, Objects.Room.getName);
-                npcs = Objects.Room.getAvailableNpcsV2(target, true);
-                debugging('在场符合条件的 npc:', npcs);
-                debugging('在场玩家：', null, DragonHelper.getUserList);
-
-                if (new Date().getTime() - start > 20000) break;
-            }
-
-            return npcs;
-        },
-
-        async locateTargetNpc (npcs) {
-            if (npcs.length === 1) return npcs[0];
-
-            for (let i = 0; i < npcs.length; i++) {
-                await Objects.Npc.action(npcs[i], '观战');
-                await ExecutionManager.wait(100);
-
-                if (DragonHelper.isTarget(npcs[i])) return npcs[i];
-            }
-        },
-
         isTarget (npc) {
             let npcKee = parseInt(System.globalObjectMap.get('msg_vs_info').get('vs2_kee1'));
             if (npcKee > 1000 * 10000) {
@@ -3693,25 +3636,32 @@ window.setTimeout(function () {
             await combat.fire();
 
             log('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
+        },
+
+        locateRoomInformation (dragon, message) {
+            let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : dragon.getGood();
+            let npcs = Objects.Room.getNpcsByMessage(message, target);
+            debugging('在场 npcs: ', npcs);
+            debugging('在场玩家：', null, DragonHelper.getUserList);
+            debugging('在场符合条件的 npc:', npcs);
+
+            return npcs;
+        },
+
+        async locateTargetNpc (npcs) {
+            if (npcs.length === 1) return npcs[0];
+
+            for (let i = 0; i < npcs.length; i++) {
+                await Objects.Npc.action(npcs[i], '观战');
+                await ExecutionManager.wait(100);
+
+                if (DragonHelper.isTarget(npcs[i])) return npcs[i];
+            }
         }
     };
 
     var MessageListener = {
-        _enabled: true,
-
-        enable () {
-            log('Message monitor enabled.');
-            MessageListener._enabled = true;
-        },
-
-        disable () {
-            log('Message monitor disabled.');
-            MessageListener._enabled = false;
-        },
-
         isWorking () {
-            if (!MessageListener._enabled) return false;
-
             return TeamworkHelper.isTeamworkModeOn();
         },
 
@@ -6005,7 +5955,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
-                        GenericMapCleaner.initialize(false, [], 300, new RegexExpressionFilter(), true);
+                        GenericMapCleaner.initialize(false, [], 300, new RegexExpressionFilter(), true, false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
