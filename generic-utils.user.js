@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.46
+// @version      2.1.47
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -634,10 +634,8 @@ window.setTimeout(function () {
 
                     if (PathManager.getPathForPurchase(this._place)) {
                         await buyFromNpc(npc, this._item.getName());
-                    } else if (PathManager.getPathForItemsFromNpcBody(this._place)) {
-                        await killAndSearch(npc);
                     } else {
-                        debugging('npc 在场但是没有找到所需物品', this._item);
+                        await killAndSearch(npc);
                     }
                 } else {
                     debugging('npc 不在场，没有找到所需物品', npc);
@@ -4982,51 +4980,6 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '天剑谷',
-            title: '随机寻找路径，叫杀天剑谷的对应 npc...',
-            id: 'id-skysword-valley-stateless',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    let blacklist = '\n不杀：' + (TianjianValleyHelper.getRegexExpression4Exclusion() ? TianjianValleyHelper.getRegexExpression4Exclusion() : '没有特别指定');
-                    let whitelist = '\n只杀：' + (TianjianValleyHelper.getRegexExpression4Match() ? TianjianValleyHelper.getRegexExpression4Match() : '没有特别指定');
-
-                    if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
-                        let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
-                        GenericMapCleaner.initialize(false, [], filter, false);
-                        await GenericMapCleaner.start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
-                } else {
-                    GenericMapCleaner.stop();
-                }
-            }
-        }, {
-            label: '设',
-            title: '指定专杀目标...',
-            width: '38px',
-            marginRight: '1px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式确认只杀哪些 npc...\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Match());
-                if (!answer) return;
-
-                TianjianValleyHelper.setRegexExpression4Match(answer);
-            }
-        }, {
-            label: '滤',
-            title: '特别指定不打的目标...\n\n注意：\n此设置优先于左边选项',
-            width: '38px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
-                if (answer || answer === '') {
-                    TianjianValleyHelper.setRegexExpression4Exclusion(answer);
-                }
-            }
-        }, {
-        }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater',
@@ -5059,28 +5012,6 @@ window.setTimeout(function () {
                     }
                 } else {
                     JobManager.getJob(this.id).stop();
-                }
-            }
-        }, {
-            label: '自动冰月',
-            title: '一键从任意处进入冰月谷，并自动杀死相关 npc 拿到长生石宝箱。',
-            id: 'id-ice-moon-valley-v2',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
-                        if (Objects.Room.getMapId() !== 'bingyuegu') {
-                            await IceMoonValleyHelper.gotoStartPoint();
-                            await ExecutionManager.wait(2000);
-                        }
-
-                        GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
-                        await GenericMapCleaner.start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
-                } else {
-                    GenericMapCleaner.stop();
                 }
             }
         }, {
@@ -5359,6 +5290,157 @@ window.setTimeout(function () {
             }
         }]
     }, {
+        subject: '特殊活动',
+
+        buttons: [{
+            label: ForestHelper.getStartPointPathAliasAbbr(),
+            title: `一键从任意处走到森林入口${ForestHelper.getStartPointPathAlias()}...\n\n注意：\n队长专属功能，队员可以不用设置。`,
+            width: '60px',
+            marginRight: '1px',
+            id: 'id-forest-startpoint',
+
+            async eventOnClick () {
+                if (Objects.Room.getMapId() === 'shenshousenlin') {
+                    window.alert('当前已经在神兽森林里了，不要重复点击。');
+                    return;
+                }
+
+                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
+                let notifyTeamRequired = false;
+                if (TeamworkHelper.isTeamworkModeOn()) {
+                    if (TeamworkHelper.Role.isTeamLead()) {
+                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
+                        notifyTeamRequired = true;
+                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
+                        return;
+                    }
+                }
+
+                if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
+                    if (notifyTeamRequired) {
+                        TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
+                    }
+
+                    Navigation.move(ForestHelper.getStartPointPath());
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置到起点的路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
+            width: '10px',
+            id: 'id-forest-startpoint-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式指定森林入口别名（可任意取名，仅作显示代号方便记忆）及实际路径（语法需严格遵守要求）：\n\n例子：幽荧殿=' + ForestHelper.getStartPointPath(), ForestHelper.getStartPointPathAlias() + '=' + ForestHelper.getStartPointPath());
+                if (!answer) return;
+
+                let matches = answer.match(/(.*?)=(.*)/);
+                if (matches && matches[1] && matches[2]) {
+                    ForestHelper.setStartPointPathAlias(matches[1]);
+                    ForestHelper.setStartPointPath(matches[2]);
+                    $('#id-forest-startpoint').text(ForestHelper.getStartPointPathAliasAbbr());
+                } else {
+                    window.alert('设置格式不正确，请参照例子重新设置');
+                }
+            }
+        }, {
+            label: '开打',
+            title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...\n\n注意：\n队长专属功能，队员可以不用设置。',
+            id: 'id-forest-killer',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (Objects.Room.getMapId() !== 'shenshousenlin') {
+                        window.alert('目前本功能只支持神兽森林，注意：请从森林起点处开始。');
+                        ButtonManager.resetButtonById(this.id);
+                        return;
+                    }
+
+                    if (TeamworkHelper.isTeamworkModeOn() && !TeamworkHelper.Role.isTeamLead()) {
+                        if (!window.confirm('当前不是队长，确定要自己杀？')) {
+                            return;
+                        } else {
+                            ButtonManager.resetButtonById(this.id);
+                            return;
+                        }
+                    }
+
+                    if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
+                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置森林入口路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
+            width: '10px',
+            id: 'id-forest-killer-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式指定森林里扫荡的起点和开打的实际路径（语法需严格遵守要求）：\n\n例子：' + ForestHelper.getTraversalPath(), ForestHelper.getTraversalPath());
+                if (!answer) return;
+
+                let matches = answer.match(/[^a-z0-9#; ]/);
+                if (!matches) {
+                    ForestHelper.setTraversalPath(answer);
+                } else {
+                    window.alert('设置格式不正确，请参照例子重新设置');
+                }
+            }
+        }, {
+        }, {
+            label: '天剑谷',
+            title: '随机寻找路径，叫杀天剑谷的对应 npc...',
+            id: 'id-skysword-valley-stateless',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    let blacklist = '\n不杀：' + (TianjianValleyHelper.getRegexExpression4Exclusion() ? TianjianValleyHelper.getRegexExpression4Exclusion() : '没有特别指定');
+                    let whitelist = '\n只杀：' + (TianjianValleyHelper.getRegexExpression4Match() ? TianjianValleyHelper.getRegexExpression4Match() : '没有特别指定');
+
+                    if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
+                        let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
+                        GenericMapCleaner.initialize(false, [], filter, false);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
+                }
+            }
+        }, {
+            label: '设',
+            title: '指定专杀目标...',
+            width: '38px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式确认只杀哪些 npc...\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Match());
+                if (!answer) return;
+
+                TianjianValleyHelper.setRegexExpression4Match(answer);
+            }
+        }, {
+            label: '滤',
+            title: '特别指定不打的目标...\n\n注意：\n此设置优先于左边选项',
+            width: '38px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
+                if (answer || answer === '') {
+                    TianjianValleyHelper.setRegexExpression4Exclusion(answer);
+                }
+            }
+        }]
+    }, {
         subject: '物品/技能',
 
         buttons: [{
@@ -5583,8 +5665,7 @@ window.setTimeout(function () {
                     SkillManager.prepareAttackSkills(choice);
                 }
             }
-        }
-        ]
+        }]
     }, {
         subject: '日常任务',
         offset: 2,
@@ -5743,8 +5824,20 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             async eventOnClick () {
-                if (window.confirm('一天只有一次机会，确定进入冰月谷？')) {
-                    await Navigation.move(PathManager.getPathForSpecificEvent('冰月谷'));
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
+                        if (Objects.Room.getMapId() !== 'bingyuegu') {
+                            await IceMoonValleyHelper.gotoStartPoint();
+                            await ExecutionManager.wait(2000);
+                        }
+
+                        GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
                 }
             }
         }, {
@@ -6051,109 +6144,6 @@ window.setTimeout(function () {
             eventOnClick () {
                 if (window.confirm('确定清除已接谜题？')) {
                     PuzzleHelper.reset();
-                }
-            }
-        }, {
-        }, {
-            label: ForestHelper.getStartPointPathAliasAbbr(),
-            title: `一键从任意处走到森林入口${ForestHelper.getStartPointPathAlias()}...\n\n注意：\n队长专属功能，队员可以不用设置。`,
-            width: '60px',
-            marginRight: '1px',
-            id: 'id-forest-startpoint',
-
-            async eventOnClick () {
-                if (Objects.Room.getMapId() === 'shenshousenlin') {
-                    window.alert('当前已经在神兽森林里了，不要重复点击。');
-                    return;
-                }
-
-                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
-                let notifyTeamRequired = false;
-                if (TeamworkHelper.isTeamworkModeOn()) {
-                    if (TeamworkHelper.Role.isTeamLead()) {
-                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
-                        notifyTeamRequired = true;
-                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
-                        return;
-                    }
-                }
-
-                if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
-                    if (notifyTeamRequired) {
-                        TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
-                    }
-
-                    Navigation.move(ForestHelper.getStartPointPath());
-                }
-            }
-        }, {
-            label: '.',
-            title: '设置到起点的路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
-            width: '10px',
-            id: 'id-forest-startpoint-setting',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式指定森林入口别名（可任意取名，仅作显示代号方便记忆）及实际路径（语法需严格遵守要求）：\n\n例子：幽荧殿=' + ForestHelper.getStartPointPath(), ForestHelper.getStartPointPathAlias() + '=' + ForestHelper.getStartPointPath());
-                if (!answer) return;
-
-                let matches = answer.match(/(.*?)=(.*)/);
-                if (matches && matches[1] && matches[2]) {
-                    ForestHelper.setStartPointPathAlias(matches[1]);
-                    ForestHelper.setStartPointPath(matches[2]);
-                    $('#id-forest-startpoint').text(ForestHelper.getStartPointPathAliasAbbr());
-                } else {
-                    window.alert('设置格式不正确，请参照例子重新设置');
-                }
-            }
-        }, {
-            label: '开打',
-            title: '一键从上面起点开始，按既定路径自动寻找路径并叫杀 npc...\n\n注意：\n队长专属功能，队员可以不用设置。',
-            id: 'id-forest-killer',
-            width: '60px',
-            marginRight: '1px',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (Objects.Room.getMapId() !== 'shenshousenlin') {
-                        window.alert('目前本功能只支持神兽森林，注意：请从森林起点处开始。');
-                        ButtonManager.resetButtonById(this.id);
-                        return;
-                    }
-
-                    if (TeamworkHelper.isTeamworkModeOn() && !TeamworkHelper.Role.isTeamLead()) {
-                        if (!window.confirm('当前不是队长，确定要自己杀？')) {
-                            return;
-                        } else {
-                            ButtonManager.resetButtonById(this.id);
-                            return;
-                        }
-                    }
-
-                    if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
-                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000);
-                        await GenericMapCleaner.start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
-                } else {
-                    GenericMapCleaner.stop();
-                }
-            }
-        }, {
-            label: '.',
-            title: '设置森林入口路径...\n\n注意：\n队长专属功能，队员可以不用设置。',
-            width: '10px',
-            id: 'id-forest-killer-setting',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式指定森林里扫荡的起点和开打的实际路径（语法需严格遵守要求）：\n\n例子：' + ForestHelper.getTraversalPath(), ForestHelper.getTraversalPath());
-                if (!answer) return;
-
-                let matches = answer.match(/[^a-z0-9#; ]/);
-                if (!matches) {
-                    ForestHelper.setTraversalPath(answer);
-                } else {
-                    window.alert('设置格式不正确，请参照例子重新设置');
                 }
             }
         }]
