@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.56
+// @version      2.1.57
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3447,14 +3447,14 @@ window.setTimeout(function () {
                 debugging('regMatch: ', regMatch);
                 debugging('regExcluded: ', regExcluded);
 
-                if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
-                    log('指定过滤掉不抢的目标：' + DragonMonitor._dragon.getBonus());
-                } else if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
+                if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
                     DragonMonitor.turnOnDragonHandler();
 
                     if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
-                } else {
-                    log('没有在关注列表里的目标：' + DragonMonitor._dragon.getBonus());
+                } else if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
+                    log('不关心的目标：' + DragonMonitor._dragon.getBonus());
+
+                    DragonMonitor.turnOnDragonEventListener();
                 }
             }
         },
