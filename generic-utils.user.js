@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.55
+// @version      2.1.56
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3428,7 +3428,11 @@ window.setTimeout(function () {
         },
 
         dragonMessageArrives (message) {
-            return DragonHelper.isValidDragonEvent(message.get('msg'));
+            if (DragonHelper.isValidDragonEvent(message.get('msg'))) {
+                DragonMonitor.turnOffDragonEventListener();
+
+                return true;
+            }
         },
 
         flyToDragonPlace (message) {
@@ -3464,14 +3468,15 @@ window.setTimeout(function () {
         },
 
         getToDragonPlace (message) {
-            debugging('到达战场', message);
-            return message.get('short') === DragonMonitor._dragon.getRoom();
+            if (System.replaceControlCharBlank(message.get('short')) === DragonMonitor._dragon.getRoom()) {
+                debugging('到达战场', message);
+                DragonMonitor.turnOffDragonHandler();
+
+                return true;
+            }
         },
 
         async takeAction (message) {
-            DragonMonitor.turnOffDragonHandler();
-            DragonMonitor.turnOffDragonEventListener();
-
             await fire(message);
 
             DragonMonitor.turnOnDragonEventListener();
@@ -3712,12 +3717,7 @@ window.setTimeout(function () {
 
             let subtype = messagePack.get('subtype');
             if (type === 'vs' && subtype === 'text') return false;
-
-            debugging('type=' + type + ', subtype=' + subtype);
-            if (type === 'channel' && subtype === 'team') {
-                debugging('检测到团队消息');
-                return false;
-            }
+            if (type === 'channel' && subtype === 'team') return false;
 
             return true;
         },
@@ -4447,7 +4447,7 @@ window.setTimeout(function () {
                 '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
                 '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
 
-                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1000;event_1_40313353;#4 s;#3 w'
+                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1500;~幽荧殿;#4 s;#3 w'
             }
         }
     };
@@ -6928,13 +6928,12 @@ window.setTimeout(function () {
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (messagePack) {
         this.originalDispatchMessage(messagePack);
 
-        if (!MessageListener.isMessageInRejectList(messagePack)) {
-            let interceptors = InterceptorRegistry.getInterceptors(messagePack.get('type'), messagePack.get('subtype'));
-            interceptors.forEach(v => v.handle(messagePack));
-        }
-
         if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
             debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
+        }
+
+        if (!MessageListener.isMessageInRejectList(messagePack)) {
+            InterceptorRegistry.getInterceptors(messagePack.get('type'), messagePack.get('subtype')).forEach(v => v.handle(messagePack));
         }
     };
 
