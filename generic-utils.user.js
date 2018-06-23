@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.51
+// @version      2.1.52
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3131,7 +3131,7 @@ window.setTimeout(function () {
             }
 
             await Objects.Room.refresh();
-            if (GenericMapCleaner._bodySearch && Objects.Room.getAvailableItemsV3('朱果')) {
+            if (GenericMapCleaner._bodySearch && Objects.Room.getAvailableItemsV3('朱果').length > 0) {
                 await ExecutionManager.wait(500);
                 await Objects.Item.action(new Item('朱果'), '捡起');
             }
