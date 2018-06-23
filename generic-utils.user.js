@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.50
+// @version      2.1.51
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3122,13 +3122,20 @@ window.setTimeout(function () {
             if (npcs.length) {
                 let combat = new Combat(200, false, !GenericMapCleaner._maxEnforce);
                 combat.initialize(npcs[0], '杀死');
-                if (GenericMapCleaner._bodySearch) ButtonManager.pressDown('id-body-search');
+                if (GenericMapCleaner._bodySearch) {
+                    ButtonManager.pressDown('id-body-search');
+                }
 
                 await combat.fire();
                 await ExecutionManager.wait(GenericMapCleaner._intervalForBreak);
             }
 
             await Objects.Room.refresh();
+            if (GenericMapCleaner._bodySearch && Objects.Room.getAvailableItemsV3('朱果')) {
+                await ExecutionManager.wait(500);
+                await Objects.Item.action(new Item('朱果'), '捡起');
+            }
+
             if (!GenericMapCleaner._locateAvailableNpcs().length) {
                 if (GenericMapCleaner._travelsalByGivenPath) {
                     if (GenericMapCleaner._path.length === 0) {
@@ -6019,7 +6026,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
-                        GenericMapCleaner.initialize(false, [], 1000, new RegexExpressionFilter(), true, false);
+                        GenericMapCleaner.initialize(false, [], 1500, new RegexExpressionFilter(), true, false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
