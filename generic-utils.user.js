@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.44
+// @version      2.1.45
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -113,7 +113,11 @@ window.setTimeout(function () {
             FOREST_TRAVERSAL_PATH: 'forest.traversal.path',
             DAILY_ONEOFF_TASK_INDEX: 'daily.oneoff.task.index',
             LAST_ACTIVE_BUTTON_IDS: 'active.button.ids',
-            INTERVAL_AUTO_RECONNECT: 'interval.auto.reconnect'
+            INTERVAL_AUTO_RECONNECT: 'interval.auto.reconnect',
+            MAP_CLEANER_REG_EXCLUDED: 'map.cleaner.reg.excluded',
+            MAP_CLEANER_REG_MATCH: 'map.cleaner.reg.match',
+            MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
+            MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -139,7 +143,7 @@ window.setTimeout(function () {
 
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
-                    if (ids[i] && ids[i] !== 'id-goto-another-world') {
+                    if (ids[i] && !ids[i].includes('-stateless')) {
                         debugging(`ids[${i}]=` + ids[i]);
                         ButtonManager.pressDown(ids[i]);
                     }
@@ -155,7 +159,7 @@ window.setTimeout(function () {
             $('button').filter(function () {
                 return $(this).text().includes('x');
             }).each(function () {
-                if ($(this).attr('id') && $(this).attr('id') !== 'id-goto-another-world') ids.push($(this).attr('id'));
+                if ($(this).attr('id') && !$(this).attr('id').includes('-stateless')) ids.push($(this).attr('id'));
             });
 
             debugging('保存当前激活的按钮', ids);
@@ -1217,13 +1221,13 @@ window.setTimeout(function () {
             '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
             '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
             '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
-            '废药渣', '废焦丹'
+            '废药渣', '废焦丹', '天寒鞋', '天寒匕'
         ],
 
         _itemsToSplit: [
             '虎皮腰带', '羊毛斗篷', '金丝甲', '红光匕', '沧海护腰', '金丝宝甲衣', '玄武盾', '星河剑',
             '夜行披风', '破军盾', '玉清棍', '残雪帽', '残雪手镯', '残雪鞋', '貂皮斗篷', '宝玉甲', '生死符',
-            '血屠刀', '残雪项链', '天寒鞋', '天寒匕'
+            '血屠刀', '残雪项链'
         ],
 
         async sell (items = []) {
@@ -2718,10 +2722,12 @@ window.setTimeout(function () {
             },
 
             getCombatInfo () {
-                let vsInfo = System.globalObjectMap.get('msg_vs_info');
                 let result = [];
                 for (let i = 1; i <= 2; i++) {
                     for (let j = 1; j <= 4; j++) {
+                        let vsInfo = System.globalObjectMap.get('msg_vs_info');
+                        if (!vsInfo) continue;
+
                         result.push(vsInfo.get(`vs${i}_name${j}`));
                     }
                     i === 1 && result.push(' vs. ');
@@ -2887,6 +2893,13 @@ window.setTimeout(function () {
                 });
             },
 
+            getNpcsByMessage (message, name) {
+                return message.elements.filter(v => v['key'].includes('npc') && (!name || System.replaceControlCharBlank(v['value']).includes(`,${name},`))).map(function (v) {
+                    let values = System.replaceControlCharBlank(v['value']).split(',');
+                    return new Npc(values[1], values[0]);
+                });
+            },
+
             getAvailableItemsV3 (name) {
                 return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('item') && (!name || v['value'].includes(`,${name},`))).map(function (v) {
                     let values = v['value'].split(',');
@@ -2973,13 +2986,13 @@ window.setTimeout(function () {
 
                         break;
                     case '比试':
-                        await ButtonManager.click('fight ' + npc.getId());
+                        ButtonManager.click('fight ' + npc.getId());
                         break;
                     case '杀死':
-                        await ButtonManager.click('kill ' + npc.getId());
+                        ButtonManager.click('kill ' + npc.getId());
                         break;
                     case '观战':
-                        await ButtonManager.click('watch_vs ' + npc.getId());
+                        ButtonManager.click('watch_vs ' + npc.getId());
                         break;
                     default:
                         await ExecutionManager.asyncExecute(Objects.Room.getNpcDomById(npc.getId()).attr('onclick'), 1000);
@@ -3036,35 +3049,81 @@ window.setTimeout(function () {
         }
     };
 
-    var AutomatedMapCleaner = {
+    class RegexExpressionFilter {
+        constructor (regexExpression4Match, regexExpression4Exclusion) {
+            this._regexExpression4Match = regexExpression4Match;
+            this._regexExpression4Exclusion = regexExpression4Exclusion;
+        }
+
+        getRegexExpression4Match () {
+            return this._regexExpression4Match;
+        }
+
+        getRegexExpression4Exclusion () {
+            return this._regexExpression4Exclusion;
+        }
+    };
+
+    var GenericMapCleaner = {
         _retry: new Retry(100),
+        _travelsalByGivenPath: true,
         _path: [],
         _stop: false,
+        _intervalForBreak: 2500,
+        _regexExpressionFilter: new RegexExpressionFilter(),
+        _bodySearch: false,
 
-        initialize (travelsalPath = [], interval = 2500) {
-            AutomatedMapCleaner._stop = false;
-            AutomatedMapCleaner._path = travelsalPath;
+        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false) {
+            GenericMapCleaner._stop = false;
+            GenericMapCleaner._travelsalByGivenPath = travelsalByGivenPath;
+            GenericMapCleaner._path = path;
+            GenericMapCleaner._intervalForBreak = intervalForBreak;
+            GenericMapCleaner._regexExpressionFilter = regexExpressionFilter;
+            GenericMapCleaner._bodySearch = bodySearch;
 
-            AutomatedMapCleaner._retry.initialize(async function killAndMove () {
-                let npcs = Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero'));
-                if (npcs.length) {
-                    let combat = new Combat();
-                    combat.initialize(npcs[0], '杀死');
-                    await combat.fire();
+            GenericMapCleaner._retry.initialize(GenericMapCleaner._killAndMove, function stopWhen () {
+                return GenericMapCleaner._stop;
+            });
+        },
 
-                    await ExecutionManager.wait(interval);
-                }
+        async _killAndMove () {
+            let npcs = GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter);
+            if (npcs.length) {
+                let combat = new Combat();
+                combat.initialize(npcs[0], '杀死');
+                if (GenericMapCleaner._bodySearch) $('#id-body-search').click();
 
-                await Objects.Room.refresh();
-                if (!Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero')).length) {
-                    if (AutomatedMapCleaner._path.length === 0) {
-                        AutomatedMapCleaner._stop = true;
+                await combat.fire();
+                await ExecutionManager.wait(GenericMapCleaner._intervalForBreak);
+            }
+
+            await Objects.Room.refresh();
+            if (!GenericMapCleaner._locateAvailableNpcs().length) {
+                if (GenericMapCleaner._travelsalByGivenPath) {
+                    if (GenericMapCleaner._path.length === 0) {
+                        GenericMapCleaner._stop = true;
                     } else {
-                        await Navigation.move(AutomatedMapCleaner._path.shift());
+                        await Navigation.move(GenericMapCleaner._path.shift());
                     }
+                } else {
+                    await Navigation.move(Objects.Room.getDirectionByRandom());
                 }
-            }, function stopWhen () {
-                return AutomatedMapCleaner._stop;
+            }
+        },
+
+        _locateAvailableNpcs (regexExpressionFilter = new RegexExpressionFilter()) {
+            return Objects.Room.getAvailableNpcsV2().filter(function (v) {
+                if (v.getId().includes('hero')) return false;
+
+                let regExcluded = regexExpressionFilter.getRegexExpression4Exclusion();
+                if (regExcluded && v.getName().match(regExcluded)) return false;
+
+                let regMatch = regexExpressionFilter.getRegexExpression4Match();
+                if (regMatch) {
+                    return v.getName().match(regMatch);
+                } else {
+                    return true;
+                }
             });
         },
 
@@ -3073,47 +3132,59 @@ window.setTimeout(function () {
         },
 
         async start () {
-            AutomatedMapCleaner._retry.fire();
+            GenericMapCleaner._retry.fire();
         },
 
         stop () {
-            AutomatedMapCleaner._stop = true;
+            GenericMapCleaner._stop = true;
+        },
+
+        getRegKeywords () {
+            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH);
+        },
+
+        setRegKeywords (regKeywords) {
+            System.setVariant(System.keys.MAP_CLEANER_REG_MATCH, regKeywords);
+        },
+
+        getRegKeywords4ExcludedTargets () {
+            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED);
+        },
+
+        setRegKeywords4ExcludedTargets (regKeywords) {
+            System.setVariant(System.keys.MAP_CLEANER_REG_EXCLUDED, regKeywords);
         }
     };
 
-    var MapCleaner = {
-        _retry: new Retry(500),
-        _path: [],
-        _stop: false,
+    var IceMoonValleyHelper = {
+        async gotoStartPoint () {
+            await Navigation.move(PathManager.getPathForSpecificEvent('冰月谷'));
+        }
+    };
 
-        reset () {
-            MapCleaner._stop = false;
+    var TianjianValleyHelper = {
+        getRegexExpression4Match () {
+            if (!System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN)) {
+                System.setVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN, '');
+            }
 
-            MapCleaner._retry.initialize(async function killAndMove () {
-                let npcs = Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero'));
-                if (npcs.length) {
-                    let combat = new Combat();
-                    combat.initialize(npcs[0], '杀死');
-                    $('#id-body-search').click();
-                    await combat.fire();
-
-                    await ExecutionManager.wait(1200);
-                }
-
-                if (!Objects.Room.getAvailableNpcsV2().filter(v => !v.getId().includes('hero')).length) {
-                    await Navigation.move(Objects.Room.getDirectionByRandom());
-                }
-            }, function stopWhen () {
-                return MapCleaner._stop;
-            });
+            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN);
         },
 
-        async start () {
-            MapCleaner._retry.fire();
+        setRegexExpression4Match (regKeywords) {
+            System.setVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN, regKeywords);
         },
 
-        stop () {
-            MapCleaner._stop = true;
+        getRegexExpression4Exclusion () {
+            if (!System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN)) {
+                System.setVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN, '');
+            }
+
+            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN);
+        },
+
+        setRegexExpression4Exclusion (regKeywords) {
+            System.setVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN, regKeywords);
         }
     };
 
@@ -3291,6 +3362,7 @@ window.setTimeout(function () {
         _active: false,
         _killBadPeople: true,
         _inProgress: false,
+        _dragon: null,
 
         _goodTargets: {
             '秀楼': '柳小花', '书房': '柳绘心', '北大街': '卖花姑娘', '厅堂': '方寡妇', '钱庄': '刘守财', '杂货铺': '方老板', '祠堂大门': '朱老伯', '南市': '客商', '打铁铺子': '王铁匠', '桑邻药铺': '杨掌柜'
@@ -3298,18 +3370,106 @@ window.setTimeout(function () {
 
         _REG_DRAGON_APPERS: `^青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
-        isActive () {
-            return DragonMonitor._active;
+        turnOnDragonEventListener () {
+            InterceptorRegistry.register(new Interceptor('监听青龙', DragonMonitor.dragonMessageArrives, DragonMonitor.flyToDragonPlace));
         },
 
-        start () {
-            DragonMonitor._active = true;
-            log('Dragon Monitor started.');
+        turnOffDragonEventListener () {
+            InterceptorRegistry.unregister('监听青龙');
         },
 
-        stop () {
-            DragonMonitor._active = false;
-            log('Dragon Monitor stopped.');
+        dragonMessageArrives (message) {
+            let type = message.get('type');
+            if (type !== 'main_msg') return false;
+
+            return DragonHelper.isValidDragonEvent(message.get('msg'));
+        },
+
+        flyToDragonPlace (message) {
+            let text = message.get('msg');
+
+            let event = DragonHelper.identifyDragonEvent(text);
+            if (event) {
+                DragonMonitor._dragon = DragonHelper.parseDragonInfo(event);
+
+                let regMatch = DragonMonitor.getRegKeywords();
+                let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
+                debugging('regMatch: ', regMatch);
+                debugging('regExcluded: ', regExcluded);
+
+                if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
+                    log('指定过滤掉不抢的目标：' + DragonMonitor._dragon.getBonus());
+                } else if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
+                    DragonMonitor.turnOnDragonHandler();
+
+                    if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
+                } else {
+                    log('没有在关注列表里的目标：' + DragonMonitor._dragon.getBonus());
+                }
+            }
+        },
+
+        turnOnDragonHandler () {
+            InterceptorRegistry.register(new Interceptor('监听到达青龙地点', DragonMonitor.getToDragonPlace, DragonMonitor.takeAction));
+        },
+
+        turnOffDragonHandler () {
+            InterceptorRegistry.unregister('监听到达青龙地点');
+        },
+
+        getToDragonPlace (message) {
+            if (message.get('type') === 'jh' && message.get('subtype') === 'info') {
+                debugging('到达战场', message);
+                return message.get('short') === DragonMonitor._dragon.getRoom();
+            }
+        },
+
+        async takeAction (message) {
+            DragonMonitor.turnOffDragonHandler();
+            DragonMonitor.turnOffDragonEventListener();
+
+            await fire(message);
+
+            DragonMonitor.turnOnDragonEventListener();
+
+            async function fire (message) {
+                let npcs = locateRoomInformation(DragonMonitor._dragon, message);
+                let npc = await locateTargetNpc(npcs);
+                if (npc) {
+                    let regMatch = DragonMonitor.getRegKeywords();
+                    if (regMatch && DragonMonitor._dragon.getBonus().match(regMatch)) {
+                        await DragonHelper.killDirectly(npc);
+                    } else if (DragonHelper.observerMode(DragonMonitor._dragon)) {
+                        await DragonHelper.observe(npc);
+                    }
+                } else {
+                    debugging('没有找到该 npc');
+                }
+
+                await Navigation.move('escape;prev;home');
+
+                function locateRoomInformation (dragon, message) {
+                    let target = DragonMonitor.getKillBadPeople() ? dragon.getEvil() : dragon.getGood();
+                    debugging('目标关键字：' + target);
+                    let npcs = Objects.Room.getNpcsByMessage(message, target);
+                    debugging('在场 npcs: ', npcs);
+                    debugging('在场玩家：', null, DragonHelper.getUserList);
+                    debugging('在场符合条件的 npc:', npcs);
+
+                    return npcs;
+                }
+
+                async function locateTargetNpc (npcs) {
+                    if (npcs.length === 1) return npcs[0];
+
+                    for (let i = 0; i < npcs.length; i++) {
+                        await Objects.Npc.action(npcs[i], '观战');
+                        await ExecutionManager.wait(100);
+
+                        if (DragonHelper.isTarget(npcs[i])) return npcs[i];
+                    }
+                }
+            }
         },
 
         getGood (roomName) {
@@ -3416,54 +3576,10 @@ window.setTimeout(function () {
         }
     };
 
-    class DragonMessageHandler {
-        constructor (dragon) {
-            this._dragon = dragon;
-        }
-
-        async handle () {
-            MessageListener.disable();
-
-            let regMatch = DragonMonitor.getRegKeywords();
-            let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
-            debugging('regMatch: ', regMatch);
-            debugging('regExcluded: ', regExcluded);
-
-            if (regExcluded && this._dragon.getBonus().match(regExcluded)) {
-                log('指定过滤掉不抢的目标：' + this._dragon.getBonus());
-            } else if (regMatch && this._dragon.getBonus().match(regMatch)) {
-                log('发现需要的目标：' + this._dragon.getBonus());
-
-                await fire(this._dragon, DragonHelper.killDirectly);
-            } else if (DragonHelper.observerMode(this._dragon)) {
-                log('发现需要观察的目标：' + this._dragon.getBonus());
-                MessageListener.enable();
-
-                await fire(this._dragon, DragonHelper.observe);
-            } else {
-                log('没有在关注列表里的目标：' + this._dragon.getBonus());
-            }
-
-            MessageListener.enable();
-
-            async function fire (dragon, action) {
-                if (Objects.Room.getNameV2() !== dragon.getRoom()) ExecutionManager.execute(`clickButton('${dragon.getLink()}', 0) `);
-
-                let npcs = await DragonHelper.locateRoomInformation(dragon);
-                let npc = await DragonHelper.locateTargetNpc(npcs);
-
-                if (npc) await action(npc);
-
-                debugging('战斗前在场 npc：' + npcs.map(v => v.getName()).join(','));
-                await Navigation.move('escape;prev;home');
-            }
-        }
-    };
-
     var DragonHelper = {
-        isValidDragonEvent (message) {
-            if (!message.includes('青龙会组织')) return false;
-            if (!areaMatched(message)) return false;
+        isValidDragonEvent (text) {
+            if (!text.includes('青龙会组织')) return false;
+            if (!areaMatched(text)) return false;
             if (CombatStatus.inProgress()) return false;
 
             return true;
@@ -3475,10 +3591,10 @@ window.setTimeout(function () {
             }
         },
 
-        identifyDragonEvent (message) {
+        identifyDragonEvent (text) {
             debugging('解析青龙信息。。。');
 
-            let event = System.replaceControlCharBlank(message);
+            let event = System.replaceControlCharBlank(text);
             debugging('过滤颜色字符: ' + event);
 
             return event.match(DragonMonitor._REG_DRAGON_APPERS);
@@ -3596,8 +3712,7 @@ window.setTimeout(function () {
         isWorking () {
             if (!MessageListener._enabled) return false;
 
-            return DragonMonitor.isActive() ||
-                TeamworkHelper.isTeamworkModeOn();
+            return TeamworkHelper.isTeamworkModeOn();
         },
 
         isMessageInRejectList (messagePack) {
@@ -3638,16 +3753,6 @@ window.setTimeout(function () {
             let message = this._messagePack.get('msg');
 
             switch (this._messagePack.get('type')) {
-                case 'main_msg':
-                    if (DragonMonitor.isActive() && DragonHelper.isValidDragonEvent(message)) {
-                        let event = DragonHelper.identifyDragonEvent(message);
-                        if (event) {
-                            let dragon = DragonHelper.parseDragonInfo(event);
-                            new DragonMessageHandler(dragon).handle();
-                        }
-                    }
-
-                    break;
                 case 'vs':
                     if (this._messagePack.get('subtype') === 'text') {
                         if (!message) return;
@@ -3663,7 +3768,7 @@ window.setTimeout(function () {
                 case 'die':
                     ButtonManager.resetButtonById('id-recover-hp-mp');
                     if (System.isLocalServer() && document.title.includes('跨服')) {
-                        $('#id-goto-another-world').cick();
+                        $('#id-goto-another-world-stateless').cick();
                     }
 
                     break;
@@ -4772,9 +4877,9 @@ window.setTimeout(function () {
                     DragonMonitor.setKillBadPerson(false);
                     ButtonManager.resetButtonById('id-dragon-monitor-kill-bad');
 
-                    DragonMonitor.start();
+                    DragonMonitor.turnOnDragonEventListener();
                 } else {
-                    DragonMonitor.stop();
+                    DragonMonitor.turnOffDragonEventListener();
                 }
             }
         }, {
@@ -4788,15 +4893,14 @@ window.setTimeout(function () {
                     DragonMonitor.setKillBadPerson(true);
                     ButtonManager.resetButtonById('id-dragon-monitor-kill-good');
 
-                    DragonMonitor.start();
+                    DragonMonitor.turnOnDragonEventListener();
                 } else {
-                    DragonMonitor.stop();
+                    DragonMonitor.turnOffDragonEventListener();
                 }
             }
         }, {
             label: '设',
             title: '设置青龙目标...',
-            id: 'id-dragon-monitor-setting',
             width: '38px',
             marginRight: '1px',
 
@@ -4927,6 +5031,52 @@ window.setTimeout(function () {
                 }
             }
         }, {
+        }, {
+            label: '天剑谷',
+            title: '随机寻找路径，叫杀天剑谷的对应 npc...',
+            id: 'id-skysword-valley-stateless',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    let blacklist = '\n不杀：' + (TianjianValleyHelper.getRegexExpression4Exclusion() ? TianjianValleyHelper.getRegexExpression4Exclusion() : '没有特别指定');
+                    let whitelist = '\n只杀：' + (TianjianValleyHelper.getRegexExpression4Match() ? TianjianValleyHelper.getRegexExpression4Match() : '没有特别指定');
+
+                    if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
+                        let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
+                        GenericMapCleaner.initialize(false, [], filter, false);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
+                }
+            }
+        }, {
+            label: '设',
+            title: '指定专杀目标...',
+            width: '38px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式确认只杀哪些 npc...\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Match());
+                if (!answer) return;
+
+                TianjianValleyHelper.setRegexExpression4Match(answer);
+            }
+        }, {
+            label: '滤',
+            title: '特别指定不打的目标...\n\n注意：\n此设置优先于左边选项',
+            width: '38px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
+                if (answer || answer === '') {
+                    TianjianValleyHelper.setRegexExpression4Exclusion(answer);
+                }
+            }
+        }, {
+        }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater',
@@ -4970,18 +5120,17 @@ window.setTimeout(function () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
                         if (Objects.Room.getMapId() !== 'bingyuegu') {
-                            await AutomatedMapCleaner.gotoStartPoint(PathManager.getPathForSpecificEvent('冰月谷'));
+                            await IceMoonValleyHelper.gotoStartPoint();
                             await ExecutionManager.wait(2000);
                         }
 
-                        AutomatedMapCleaner.initialize('~寒冰之湖;~冰月湖心'.split(';'), 3000);
-
-                        await AutomatedMapCleaner.start();
+                        GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
+                        await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
-                    AutomatedMapCleaner.stop();
+                    GenericMapCleaner.stop();
                 }
             }
         }, {
@@ -5084,7 +5233,7 @@ window.setTimeout(function () {
         }, {
             label: '一键跨服',
             title: '自动寻路到杜宽处，进入跨服...\n\n注意：进入跨服会自动换成战斗装备。',
-            id: 'id-goto-another-world',
+            id: 'id-goto-another-world-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -5849,6 +5998,23 @@ window.setTimeout(function () {
                 }
             }
         }, {
+            label: '清秘境',
+            title: '叫杀当前秘境地图的所有 npc，随机寻找路径，战斗结束后自动搜身...',
+            id: 'id-secure-map-cleaner',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
+                        GenericMapCleaner.initialize(false, [], 300, new RegexExpressionFilter(), true);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
+                }
+            }
+        }, {
             label: '$1',
             title: '给指定奇侠 1 金锭',
             width: '38px',
@@ -5874,23 +6040,6 @@ window.setTimeout(function () {
                 }
 
                 await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送15金锭');
-            }
-        }, {
-            label: '随机走杀',
-            title: '叫杀当前地图的所有 npc，随机寻找路径，战斗结束后自动搜身...',
-            id: 'id-map-killer',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
-                        MapCleaner.reset();
-                        await MapCleaner.start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
-                } else {
-                    MapCleaner.stop();
-                }
             }
         }, {
             label: '一键果子',
@@ -6031,14 +6180,13 @@ window.setTimeout(function () {
                     }
 
                     if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
-                        AutomatedMapCleaner.initialize(ForestHelper.getTraversalPath().split(';').extract(), 5000);
-
-                        await AutomatedMapCleaner.start();
+                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000);
+                        await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
-                    AutomatedMapCleaner.stop();
+                    GenericMapCleaner.stop();
                 }
             }
         }, {
