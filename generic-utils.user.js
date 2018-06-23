@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.54
+// @version      2.1.55
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -124,7 +124,7 @@ window.setTimeout(function () {
             System._automatedReconnect = automatedReconnect;
 
             if (automatedReconnect) {
-                InterceptorRegistry.register(new Interceptor('掉线监测', DisconnectionHandler.isDisconnected, DisconnectionHandler.reconnect));
+                InterceptorRegistry.register(new Interceptor('掉线监测', DisconnectionHandler.isDisconnected, DisconnectionHandler.reconnect, 'disconnect'));
             } else {
                 InterceptorRegistry.unregister('掉线监测');
             }
@@ -344,7 +344,7 @@ window.setTimeout(function () {
 
     var DisconnectionHandler = {
         isDisconnected (message) {
-            return message.get('type') === 'disconnect';
+            return true;
         },
 
         reconnect (message) {
@@ -554,20 +554,30 @@ window.setTimeout(function () {
             this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)), 1);
         },
 
-        getInterceptors () {
-            return this._interceptors;
+        getInterceptors (type, subtype) {
+            return this._interceptors.filter(v => (!type || v.getType() === type) && (!subtype || v.getSubtype() === subtype));
         }
     };
 
     class Interceptor {
-        constructor (alias, criterial, behavior) {
+        constructor (alias, criterial, behavior, type, subtype) {
             this._alias = alias;
             this._criterial = criterial;
             this._behavior = behavior;
+            this._type = type;
+            this._subtype = subtype;
         }
 
         getAlias () {
             return this._alias;
+        }
+
+        getType () {
+            return this._type;
+        }
+
+        getSubtype () {
+            return this._subtype;
         }
 
         handle (message) {
@@ -740,15 +750,15 @@ window.setTimeout(function () {
         },
 
         turnOnClanTaskListener () {
-            InterceptorRegistry.register(new Interceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask));
-            InterceptorRegistry.register(new Interceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask));
+            InterceptorRegistry.register(new Interceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask, 'main_msg', 'text'));
+            InterceptorRegistry.register(new Interceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask, 'main_msg', 'text'));
             InterceptorRegistry.register(new Interceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton));
         },
 
         turnOnMasterTaskListener () {
-            InterceptorRegistry.register(new Interceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask));
-            InterceptorRegistry.register(new Interceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask));
-            InterceptorRegistry.register(new Interceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton));
+            InterceptorRegistry.register(new Interceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask, 'main_msg', 'text'));
+            InterceptorRegistry.register(new Interceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask, 'main_msg', 'text'));
+            InterceptorRegistry.register(new Interceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton, 'main_msg', 'text'));
         },
 
         turnOffClanTaskListener () {
@@ -814,12 +824,7 @@ window.setTimeout(function () {
         },
 
         _keywordAppears (message, keyword) {
-            if (message.get('type') === 'main_msg' && message.get('ctype') === 'text') {
-                let text = System.replaceControlCharBlank(message.get('msg'));
-                return text.includes(keyword);
-            }
-
-            return false;
+            return System.replaceControlCharBlank(message.get('msg')).includes(keyword);
         }
     };
 
@@ -1340,7 +1345,7 @@ window.setTimeout(function () {
         _teamworkModeOn: false,
 
         turnOnJoinRequestAutomatedApproval () {
-            InterceptorRegistry.register(new Interceptor('自动批准组队申请', TeamworkHelper.Constructure.joinRequestArrives, TeamworkHelper.Constructure.approveJoinRequest));
+            InterceptorRegistry.register(new Interceptor('自动批准组队申请', TeamworkHelper.Constructure.joinRequestArrives, TeamworkHelper.Constructure.approveJoinRequest, 'prompt'));
         },
 
         turnOffJoinRequestAutomatedApproval () {
@@ -1373,29 +1378,43 @@ window.setTimeout(function () {
             _isFollowingEscapeActive: false,
 
             startGroupBattle () {
-                InterceptorRegistry.register(new Interceptor('群殴模式', TeamworkHelper.Combat.newBattleEvent, TeamworkHelper.Combat.fightTogether));
+                InterceptorRegistry.register(new Interceptor('群殴模式-跟着打', TeamworkHelper.Combat.battleHappened, TeamworkHelper.Combat.fightTogether, 'channel', 'team'));
+                InterceptorRegistry.register(new Interceptor('群殴模式-喊帮手', TeamworkHelper.Combat.startBattle, TeamworkHelper.Combat.askForHelp, 'vs', 'text'));
             },
 
             stopGroupBattle () {
-                InterceptorRegistry.unregister('群殴模式');
+                InterceptorRegistry.unregister('群殴模式-跟着打');
+                InterceptorRegistry.unregister('群殴模式-喊帮手');
             },
 
-            newBattleEvent (message) {
+            battleHappened (message) {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
 
-                let type = message.get('type');
-                let subtype = message.get('subtype');
                 let text = System.replaceControlCharBlank(message.get('msg'));
-                if (type === 'channel' && subtype === 'team') {
-                    return text.includes('：全体注意，') && (text.includes('杀死') || text.includes('比试'));
-                } else if (type === 'vs' && subtype === 'text') {
-                    return text.includes('你对著');
+
+                return text.includes('：全体注意，') && (text.includes('杀死') || text.includes('比试'));
+            },
+
+            startBattle (message) {
+                if (!TeamworkHelper.isTeamworkModeOn()) return false;
+
+                let text = System.replaceControlCharBlank(message.get('msg'));
+
+                return text.includes('你对著');
+            },
+
+            askForHelp (message) {
+                let text = System.replaceControlCharBlank(message.get('msg'));
+                debugging('判定是否需要团队帮忙...', text);
+
+                if (TeamworkHelper.Combat.isMyBattleEvent(text)) {
+                    TeamworkHelper.Combat.notifyTeamForBattle(text);
                 }
             },
 
             fightTogether (message) {
                 let text = System.replaceControlCharBlank(message.get('msg'));
-                debugging('判定团队战斗指令：', text);
+                debugging('判定是否帮忙打...', text);
 
                 if (text.includes('杀死') || text.includes('比试')) {
                     if (CombatStatus.inProgress()) return;
@@ -1405,13 +1424,11 @@ window.setTimeout(function () {
                     if (matches && matches[1] !== User.getName()) {
                         TeamworkHelper.Combat.followBattleAction(matches[1], matches[2], matches[3]);
                     }
-                } else if (TeamworkHelper.Combat.isMyBattleEvent(text)) {
-                    TeamworkHelper.Combat.notifyTeamForBattle(text);
                 }
             },
 
             startFollowingEscape () {
-                InterceptorRegistry.register(new Interceptor('集体撤退', TeamworkHelper.Combat.newEscapeEvent, TeamworkHelper.Combat.escapeTogether));
+                InterceptorRegistry.register(new Interceptor('集体撤退', TeamworkHelper.Combat.newEscapeEvent, TeamworkHelper.Combat.escapeTogether, 'vs', 'text'));
             },
 
             stopFollowingEscape () {
@@ -1419,9 +1436,7 @@ window.setTimeout(function () {
             },
 
             newEscapeEvent (message) {
-                if (message.get('type') === 'vs' && message.get('subtype') === 'text') {
-                    return message.get('msg').match('一看势头不对，溜了！');
-                }
+                return message.get('msg').match('一看势头不对，溜了！');
             },
 
             isMyBattleEvent (text) {
@@ -1508,9 +1523,7 @@ window.setTimeout(function () {
             },
 
             joinRequestArrives (message) {
-                if (message.get('type') === 'prompt') {
-                    return message.get('msg').includes('想要加入你的队伍。');
-                }
+                return message.get('msg').includes('想要加入你的队伍。');
             },
 
             approveJoinRequest (message) {
@@ -1521,7 +1534,7 @@ window.setTimeout(function () {
 
         Navigation: {
             turnOnTeamMoving () {
-                InterceptorRegistry.register(new Interceptor('跟队长移动', TeamworkHelper.Navigation.newCommandArrives, TeamworkHelper.Navigation.moveWithTeamLead));
+                InterceptorRegistry.register(new Interceptor('跟队长移动', TeamworkHelper.Navigation.newCommandArrives, TeamworkHelper.Navigation.moveWithTeamLead, 'channel', 'team'));
             },
 
             turnOffTeamMoving () {
@@ -1529,14 +1542,12 @@ window.setTimeout(function () {
             },
 
             newCommandArrives (message) {
-                if (message.get('type') === 'channel' && message.get('subtype') === 'team') {
-                    let text = System.replaceControlCharBlank(message.get('msg'));
-                    if (!text.includes(TeamworkHelper.Constructure.getTeamLeadName())) return false;
+                let text = System.replaceControlCharBlank(message.get('msg'));
+                if (!text.includes(TeamworkHelper.Constructure.getTeamLeadName())) return false;
 
-                    if (text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
-                    if (text.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
-                    if (text.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`)) return true;
-                }
+                if (text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
+                if (text.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。')) return true;
+                if (text.match(`^href;0;team【队伍】(.*?)：全体注意，目标(.*?)，路径(.*?)。`)) return true;
             },
 
             moveWithTeamLead (message) {
@@ -3409,7 +3420,7 @@ window.setTimeout(function () {
         _REG_DRAGON_APPERS: `^青龙会组织：(.*?)正在(.*?)施展力量，本会愿出(.*?)的战利品奖励给本场战斗的最终获胜者。这是本(大)?区第(.*?)个(跨服)?青龙。`,
 
         turnOnDragonEventListener () {
-            InterceptorRegistry.register(new Interceptor('监听青龙', DragonMonitor.dragonMessageArrives, DragonMonitor.flyToDragonPlace));
+            InterceptorRegistry.register(new Interceptor('监听青龙', DragonMonitor.dragonMessageArrives, DragonMonitor.flyToDragonPlace, 'main_msg'));
         },
 
         turnOffDragonEventListener () {
@@ -3417,9 +3428,6 @@ window.setTimeout(function () {
         },
 
         dragonMessageArrives (message) {
-            let type = message.get('type');
-            if (type !== 'main_msg') return false;
-
             return DragonHelper.isValidDragonEvent(message.get('msg'));
         },
 
@@ -3448,7 +3456,7 @@ window.setTimeout(function () {
         },
 
         turnOnDragonHandler () {
-            InterceptorRegistry.register(new Interceptor('监听到达青龙地点', DragonMonitor.getToDragonPlace, DragonMonitor.takeAction));
+            InterceptorRegistry.register(new Interceptor('监听到达青龙地点', DragonMonitor.getToDragonPlace, DragonMonitor.takeAction, 'jh', 'info'));
         },
 
         turnOffDragonHandler () {
@@ -3456,10 +3464,8 @@ window.setTimeout(function () {
         },
 
         getToDragonPlace (message) {
-            if (message.get('type') === 'jh' && message.get('subtype') === 'info') {
-                debugging('到达战场', message);
-                return message.get('short') === DragonMonitor._dragon.getRoom();
-            }
+            debugging('到达战场', message);
+            return message.get('short') === DragonMonitor._dragon.getRoom();
         },
 
         async takeAction (message) {
@@ -3706,7 +3712,12 @@ window.setTimeout(function () {
 
             let subtype = messagePack.get('subtype');
             if (type === 'vs' && subtype === 'text') return false;
-            if (type === 'channel' && subtype === 'team') return false;
+
+            debugging('type=' + type + ', subtype=' + subtype);
+            if (type === 'channel' && subtype === 'team') {
+                debugging('检测到团队消息');
+                return false;
+            }
 
             return true;
         },
@@ -5076,7 +5087,7 @@ window.setTimeout(function () {
 
         buttons: [{
             label: '一键回家',
-            title: '紧急情况下点此按钮可以一键回家，无需任何确认步骤。',
+            title: '紧急情况下点此按钮可以一键回家，无需任何确认步骤。如在战斗中点此按钮会先自动逃跑。',
             id: 'id-home',
             backgroundColor: 'rgba(150,250,100,0.8)',
 
@@ -6918,7 +6929,8 @@ window.setTimeout(function () {
         this.originalDispatchMessage(messagePack);
 
         if (!MessageListener.isMessageInRejectList(messagePack)) {
-            InterceptorRegistry.getInterceptors().forEach(v => v.handle(messagePack));
+            let interceptors = InterceptorRegistry.getInterceptors(messagePack.get('type'), messagePack.get('subtype'));
+            interceptors.forEach(v => v.handle(messagePack));
         }
 
         if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
