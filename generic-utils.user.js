@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.59
+// @version      2.1.60
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3487,8 +3487,11 @@ window.setTimeout(function () {
             await fire(message);
 
             async function fire (message) {
+                debugging('开始定位青龙...');
                 let npcs = DragonHelper.locateRoomInformation(DragonMonitor._dragon, message);
                 let npc = await DragonHelper.locateTargetNpc(npcs);
+                debugging('定位青龙完毕。');
+
                 if (npc) {
                     let regMatch = DragonMonitor.getRegKeywords();
                     if (regMatch && DragonMonitor._dragon.getBonus().match(regMatch)) {
@@ -3724,6 +3727,7 @@ window.setTimeout(function () {
             let subtype = messagePack.get('subtype');
             if (type === 'vs' && subtype === 'text') return false;
             if (type === 'channel' && subtype === 'team') return false;
+            if (type === 'jh' && subtype === 'info') return false;
 
             return true;
         },
