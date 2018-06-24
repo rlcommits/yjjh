@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.61
+// @version      2.1.62
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1398,6 +1398,7 @@ window.setTimeout(function () {
 
             battleHappened (message) {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
+                if (!message.get('msg')) return false;
 
                 let text = System.replaceControlCharBlank(message.get('msg'));
 
@@ -1406,6 +1407,7 @@ window.setTimeout(function () {
 
             startBattle (message) {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
+                if (!message.get('msg')) return false;
 
                 let text = System.replaceControlCharBlank(message.get('msg'));
 
