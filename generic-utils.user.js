@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.60
+// @version      2.1.61
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -187,6 +187,7 @@ window.setTimeout(function () {
             logCurrentSettings();
 
             function logCurrentSettings () {
+                log('************************************当前用户设置***************************************************');
                 log(`自动出招设置：${System.getVariant(System.keys.ATTACK_SKILLS)} - 预留 ${System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)} 气`);
                 log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
                 log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
@@ -197,6 +198,7 @@ window.setTimeout(function () {
                 log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
                 log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
                 log(`调试信息屏蔽：${System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED)}`);
+                log('**************************************************************************************************');
             }
 
             async function analyseEnforce () {
@@ -546,7 +548,8 @@ window.setTimeout(function () {
 
         register (interceptor) {
             if (this._interceptors.includes(interceptor)) {
-                log('拦截器已经存在：' + interceptor.getAlias());
+                log('拦截器已经存在，不再重复注册：' + interceptor.getAlias());
+                return;
             }
 
             log('注册拦截器：' + interceptor.getAlias());
@@ -3716,27 +3719,11 @@ window.setTimeout(function () {
         }
     };
 
-    var MessageListener = {
-        isMessageInRejectList (messagePack) {
-            let type = messagePack.get('type');
-
-            if (type === 'main_msg') return false;
-            if (type === 'prompt') return false;
-            if (type === 'disconnect') return false;
-
-            let subtype = messagePack.get('subtype');
-            if (type === 'vs' && subtype === 'text') return false;
-            if (type === 'channel' && subtype === 'team') return false;
-            if (type === 'jh' && subtype === 'info') return false;
-
-            return true;
-        },
-
+    var MessageLogger = {
         isMessageInLoggingRejectedList (messagePack) {
             if (!System.getDebugMessageBlacklist()) return false;
 
-            let filters = System.getDebugMessageBlacklist().split(',');
-            return filters.some(function (v) {
+            return System.getDebugMessageBlacklist().split(',').some(function (v) {
                 if (!v.includes('|')) {
                     return messagePack.get('type') === v;
                 } else {
@@ -3744,6 +3731,12 @@ window.setTimeout(function () {
                     return messagePack.get('type') === keywords[0] && messagePack.get('subtype') === keywords[1];
                 }
             });
+        },
+
+        log (messagePack) {
+            if (MessageLogger.isMessageInLoggingRejectedList(messagePack)) return;
+
+            debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
         }
     };
 
@@ -6935,16 +6928,12 @@ window.setTimeout(function () {
     inintializeHelpButtons(helperConfigurations);
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
-    window.unsafeWindow.gSocketMsg.dispatchMessage = function (messagePack) {
-        this.originalDispatchMessage(messagePack);
+    window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
+        this.originalDispatchMessage(message);
 
-        if (!MessageListener.isMessageInLoggingRejectedList(messagePack)) {
-            debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
-        }
+        MessageLogger.log(message);
 
-        if (!MessageListener.isMessageInRejectList(messagePack)) {
-            InterceptorRegistry.getInterceptors(messagePack.get('type'), messagePack.get('subtype')).forEach(v => v.handle(messagePack));
-        }
+        InterceptorRegistry.getInterceptors(message.get('type'), message.get('subtype')).forEach(v => v.handle(message));
     };
 
     log('脚本加载完毕。');
