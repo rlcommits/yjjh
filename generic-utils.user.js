@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.62
+// @version      2.1.63
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1409,9 +1409,7 @@ window.setTimeout(function () {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
                 if (!message.get('msg')) return false;
 
-                let text = System.replaceControlCharBlank(message.get('msg'));
-
-                return text.includes('你对著');
+                return message.get('msg').includes('你对著');
             },
 
             askForHelp (message) {
@@ -2116,7 +2114,7 @@ window.setTimeout(function () {
         _REG_NO_BAIT: '你还没有鱼饵',
 
         async gotoTarget () {
-            $('#id-escape').click();
+            ButtonManager.pressDown('id-escape');
 
             if (await mapLocked()) {
                 await Navigation.move(PathManager.getPathForSpecificEvent('扬州出发钓鱼加玄铁'));
@@ -3682,13 +3680,12 @@ window.setTimeout(function () {
         async observe (npc) {
             await Objects.Npc.action(npc, '观战');
 
-            log('开始观战时在场人员：', null, Panels.Combat.getCombatInfo);
             for (let i = 0; i < 15; i++) {
                 debugging('战场信息：', null, Panels.Combat.getCombatInfo);
                 await ExecutionManager.wait(500);
             }
 
-            log('结束观战时在场人员：', null, Panels.Combat.getCombatInfo);
+            debugging('结束观战时在场人员：', null, Panels.Combat.getCombatInfo);
         },
 
         async killDirectly (npc) {
@@ -3696,7 +3693,7 @@ window.setTimeout(function () {
             combat.initialize(npc, '杀死');
             await combat.fire();
 
-            log('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
+            debugging('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
         },
 
         locateRoomInformation (dragon, message) {
