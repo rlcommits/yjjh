@@ -118,7 +118,10 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_MATCH: 'map.cleaner.reg.match',
             MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
             MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
-            CLAN_BATTLE_PLACE: 'clan.battle.place.remote'
+            CLAN_BATTLE_PLACE: 'clan.battle.place.remote',
+            ITEMS_TO_SELL: 'items.sell',
+            ITEMS_TO_SPLIT: 'items.split',
+            ITEMS_TO_STORE: 'items.store'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -1296,6 +1299,107 @@ window.setTimeout(function () {
             for (let i = 0; i < items.length; i++) {
                 await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
                 log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
+            }
+        },
+
+        getItemListWithQuantities (items = []) {
+            return items.map(v => v.getName() + '(数量 ' + v.getQuantity() + ')').join('\n');
+        }
+    };
+
+    var BackpackCleanerV2 = {
+        _itemsToSellByDefault: [
+            '天寒手镯', '天寒戒', '天寒项链',
+            '钢剑', '长剑', '单刀', '竹剑', '匕首', '鬼头刀', '长鞭', '木棍', '逆钩匕', '羊角匕', '木刀', '木叉', '木锤', '金刚杖',
+            '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
+            '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
+            '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
+            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫', '绣花鞋', '舞蝶彩衫',
+            '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
+            '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
+            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
+            '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
+            '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
+            '废药渣', '废焦丹', '天寒鞋', '天寒匕'
+        ],
+
+        _itemsToSplitByDefault: [
+            '虎皮腰带', '羊毛斗篷', '金丝甲', '红光匕', '沧海护腰', '金丝宝甲衣', '玄武盾', '星河剑',
+            '夜行披风', '破军盾', '玉清棍', '残雪帽', '残雪手镯', '残雪鞋', '貂皮斗篷', '宝玉甲', '生死符',
+            '血屠刀', '残雪项链'
+        ],
+
+        _itemsToStoreByDefault: [],
+
+        async sell (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await sellSpecificItem(items[i]);
+            }
+
+            async function sellSpecificItem (item = new Item()) {
+                let numberInBatch = item.getQuantity() >= 100 ? 100 : (item.getQuantity() >= 50 ? 50 : (item.getQuantity() >= 10 ? 10 : 0));
+                if (numberInBatch) {
+                    await ButtonManager.click(`items sell ${item.getId()}_N_${numberInBatch}`);
+                    log(`${item.getName()} 已卖，数量 ${numberInBatch}`);
+                    item.setQuantity(item.getQuantity() - numberInBatch);
+
+                    await sellSpecificItem(item);
+                } else if (item.getQuantity()) {
+                    await ButtonManager.click(`#${item.getQuantity()} items sell ${item.getId()}`);
+                    log(`${item.getName()} 已卖，数量 ${item.getQuantity()}`);
+                }
+            }
+        },
+
+        getItemsToSell () {
+            let itemListString = System.getVariant(System.keys.ITEMS_TO_SELL);
+            if (!itemListString) {
+                itemListString = BackpackCleanerV2._itemsToSellByDefault.join(',');
+                System.setVariant(System.keys.ITEMS_TO_SELL, itemListString);
+            }
+
+            let items = itemListString.split(',');
+            return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
+        },
+
+        getItems (key, defaultItems) {
+            let itemListString = System.getVariant(key);
+            if (!itemListString) {
+                itemListString = defaultItems.join(',');
+                System.setVariant(key, itemListString);
+            }
+
+            let items = itemListString.split(',');
+            return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
+        },
+
+        getItemListString (key, defaultItems) {
+            return BackpackCleanerV2.getItems(key, defaultItems).map(v => v.getName()).join(',');
+        },
+
+        setItemsToSell (items) {
+            System.setVariant(System.keys.ITEMS_TO_SELL, items);
+        },
+
+        setItemsToSplit (items) {
+            System.setVariant(System.keys.ITEMS_TO_SPLIT, items);
+        },
+
+        setItemsToStore (items) {
+            System.setVariant(System.keys.ITEMS_TO_STORE, items);
+        },
+
+        async split (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
+                log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
+            }
+        },
+
+        async store (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await ButtonManager.click(`items put_store ${items[i].getId()}`, 180);
+                log(`${items[i].getName()} 已放仓库，数量 ${items[i].getQuantity()}`);
             }
         },
 
@@ -4981,6 +5085,72 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '整理包裹',
+            title: '一键卖掉分解背包里不需要的垃圾...',
+
+            async eventOnClick () {
+                let currentView = $('.outtitle').text();
+                await ButtonManager.click('items');
+
+                let itemsToSell = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_SELL, BackpackCleanerV2._itemsToSellByDefault);
+                let itemsToSplit = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_SPLIT, BackpackCleanerV2._itemsToSplitByDefault);
+                let itemsToStore = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_STORE, BackpackCleanerV2._itemsToStoreByDefault);
+                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length) {
+                    window.alert('背包里能处理的都已经处理了。');
+                } else {
+                    let confirmationMessage = '确定处理掉身上的这些物品？';
+                    if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToSell);
+                    if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToSplit);
+                    if (itemsToStore.length) confirmationMessage += '\n\n放仓库：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToStore);
+
+                    if (window.confirm(confirmationMessage)) {
+                        await BackpackCleanerV2.sell(itemsToSell);
+                        await BackpackCleanerV2.split(itemsToSplit);
+                        await BackpackCleanerV2.store(itemsToStore);
+                    }
+                }
+
+                if (currentView !== '状 态') {
+                    ButtonManager.click('prev');
+                }
+            }
+        }, {
+            label: '卖',
+            title: '设置一键卖的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_SELL, BackpackCleanerV2._itemsToSellByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToSell(answer);
+                }
+            }
+        }, {
+            label: '解',
+            title: '设置需要一键分解的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_SPLIT, BackpackCleanerV2._itemsToSplitByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToSplit(answer);
+                }
+            }
+        }, {
+            label: '仓',
+            title: '设置需要一键放进仓库的物品列表...',
+            width: '24px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_STORE, BackpackCleanerV2._itemsToStoreByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToStore(answer);
+                }
+            }
+        }, {
+        }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater-stateless',
@@ -5845,7 +6015,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '谷',
-            title: '进入冰月谷...',
+            title: '进入冰月谷并自动打到冰月湖心...\n\n注意：中途有短暂等待是为了确保页面加载完毕，请勿重复点击。',
             id: 'id-icemoon-valley',
             width: '38px',
             marginRight: '1px',
@@ -5869,7 +6039,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '壁',
-            title: '一键从任意处到大昭壁画所在地面壁...',
+            title: '一键从任意处到大昭壁画所在地面壁...\n\n注意：此项目已经实现全自动，且中途可以手工停止。',
             width: '38px',
 
             async eventOnClick () {
