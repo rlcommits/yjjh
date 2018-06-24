@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.58
+// @version      2.1.59
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -545,6 +545,10 @@ window.setTimeout(function () {
         _interceptors: [],
 
         register (interceptor) {
+            if (this._interceptors.includes(interceptor)) {
+                log('拦截器已经存在：' + interceptor.getAlias());
+            }
+
             log('注册拦截器：' + interceptor.getAlias());
             this._interceptors.push(interceptor);
         },
@@ -764,11 +768,13 @@ window.setTimeout(function () {
         turnOffClanTaskListener () {
             InterceptorRegistry.unregister('帮派申请任务');
             InterceptorRegistry.unregister('帮派自动继续任务');
+            InterceptorRegistry.unregister('帮派任务过量');
         },
 
         turnOffMasterTaskListener () {
             InterceptorRegistry.unregister('师门申请任务');
             InterceptorRegistry.unregister('师门自动继续任务');
+            InterceptorRegistry.unregister('师门任务过量');
         },
 
         newClanTaskArrived (message) {
@@ -3429,8 +3435,6 @@ window.setTimeout(function () {
 
         dragonMessageArrives (message) {
             if (DragonHelper.isValidDragonEvent(message.get('msg'))) {
-                DragonMonitor.turnOffDragonEventListener();
-
                 return true;
             }
         },
@@ -3457,8 +3461,6 @@ window.setTimeout(function () {
                     } else {
                         log('没有关注的目标：' + DragonMonitor._dragon.getBonus());
                     }
-
-                    DragonMonitor.turnOnDragonEventListener();
                 }
             }
         },
@@ -3472,9 +3474,10 @@ window.setTimeout(function () {
         },
 
         getToDragonPlace (message) {
+            debugging('检测是否到达战场...', message);
+
             if (System.replaceControlCharBlank(message.get('short')) === DragonMonitor._dragon.getRoom()) {
                 debugging('到达战场', message);
-                DragonMonitor.turnOffDragonHandler();
 
                 return true;
             }
@@ -3482,8 +3485,6 @@ window.setTimeout(function () {
 
         async takeAction (message) {
             await fire(message);
-
-            DragonMonitor.turnOnDragonEventListener();
 
             async function fire (message) {
                 let npcs = DragonHelper.locateRoomInformation(DragonMonitor._dragon, message);
@@ -3499,6 +3500,7 @@ window.setTimeout(function () {
                     debugging('没有找到该 npc');
                 }
 
+                DragonMonitor.turnOffDragonHandler();
                 await Navigation.move('escape;prev;home');
             }
         },
