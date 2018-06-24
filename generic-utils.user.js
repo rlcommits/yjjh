@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.63
+// @version      2.1.64
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -117,7 +117,8 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_EXCLUDED: 'map.cleaner.reg.excluded',
             MAP_CLEANER_REG_MATCH: 'map.cleaner.reg.match',
             MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
-            MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian'
+            MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
+            CLAN_BATTLE_PLACE: 'clan.battle.place.remote'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -3087,14 +3088,30 @@ window.setTimeout(function () {
     };
 
     var ClanCombatHelper = {
-        _place: '',
-
         async back () {
             let roomName = Objects.Room.getName();
             let matches = roomName.match(/武林广场(.*)/);
-            let numberOfSteps = parseInt(matches[1]) - 1;
 
-            await Navigation.move(`#${numberOfSteps} w`);
+            let numberOfSteps = parseInt(matches[1]) - 1;
+            if (numberOfSteps) {
+                await Navigation.move(`#${numberOfSteps} w`);
+            }
+
+            let steps = ClanCombatHelper.getBattlePlace().split('-');
+            await Navigation.travelsalWithEvent('武林广场走一遍', function findRightPlace () {
+                return Objects.Room.getEventByName(steps[0]);
+            });
+
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[0]));
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[1]));
+        },
+
+        setBattlePlace (battlePlace) {
+            System.setVariant(System.keys.CLAN_BATTLE_PLACE, battlePlace);
+        },
+
+        getBattlePlace () {
+            return System.getVariant(System.keys.CLAN_BATTLE_PLACE);
         }
     };
 
@@ -3963,7 +3980,9 @@ window.setTimeout(function () {
                 '全真教': 'jh 19;#3 s;sw;s;e;n;nw;#4 n;e;w;w;e;n;#3 w;s;n;w;s;n;#5 e;n;s;e;e;w;n;n;s;s;w;w;n;n;w;w;s;s;n;n;w;s;s;n;n;w;#4 n;e;n;#3 s;e;n;n;w;e;e;s;s;n;n;e;n',
                 '古墓': 'jh 20;w;w;s;e;#5 s;sw;sw;s;s;e;w;#4 s',
                 '白驼山': 'jh 21;#4 n;#4 s;nw;s;n;w;n;s;w;nw;e;w;nw;nw;n;w;sw;jh 21;nw;w;w;nw;n;e;w;n;n;w;e;n;n;e;e;w;ne;sw;e;se;nw;w;n;s;s;n;w;w;#4 n;#3 s;#4 e;n;n;e;e;w;w;w;e;n;nw;se;ne;e;w;n;jh 21;nw;ne;ne;sw;n;n;ne;w;e;n;n;w;w',
-                '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s'
+                '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s',
+
+                '武林广场走一遍': '#9 e'
             },
 
             NPC: {
@@ -4928,15 +4947,6 @@ window.setTimeout(function () {
                 ButtonManager.resetAllButtons();
             }
         }, {
-            label: '帮战回位',
-            title: '帮战挂了自动一键走回战场...',
-            id: 'id-gan-fight-back',
-            hidden: true,
-
-            async eventOnClick () {
-                await ClanCombatHelper.back();
-            }
-        }, {
         }, {
             label: '自动跟招',
             title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
@@ -4986,7 +4996,6 @@ window.setTimeout(function () {
                     JobManager.getJob(this.id).stop();
                 }
             }
-        }, {
         }, {
             label: '抢杀',
             title: '抢杀某个指定目标...',
@@ -5063,15 +5072,6 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 ButtonManager.resetAllButtons();
-            }
-        }, {
-            label: '帮战回位',
-            title: '帮战挂了自动一键走回战场...',
-            id: 'id-gan-fight-back',
-            hidden: true,
-
-            async eventOnClick () {
-                await ClanCombatHelper.back();
             }
         }, {
         }, {
@@ -5428,6 +5428,42 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
                 if (answer || answer === '') {
                     TianjianValleyHelper.setRegexExpression4Exclusion(answer);
+                }
+            }
+        }, {
+        }, {
+            label: '回帮战',
+            title: '帮战挂了自动一键由任意武林广场走回战场...',
+            id: 'id-gan-fight-back',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (System.isLocalServer()) {
+                    window.alert('跨服专用功能，本服不适用');
+                    return;
+                }
+
+                if (!ClanCombatHelper.getBattlePlace()) {
+                    $('#id-gan-fight-back-setting').click();
+                } else {
+                    await ClanCombatHelper.back();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置帮战挂了回战场的目标地点...',
+            id: 'id-gan-fight-back-setting',
+            width: '10px',
+
+            async eventOnClick () {
+                let answer = window.prompt('帮战地点是哪里？可以参照以下格式设置...\n\n例子：怒蛟泽-玄阁', ClanCombatHelper.getBattlePlace());
+                if (answer) {
+                    if (answer.split('-').length !== 2) {
+                        window.alert('必须按 怒蛟泽-玄阁 这样的格式，否则无法识别。');
+                    } else {
+                        ClanCombatHelper.setBattlePlace(answer);
+                    }
                 }
             }
         }]
