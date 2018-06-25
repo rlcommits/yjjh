@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.62
+// @version      2.1.64
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -117,7 +117,11 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_EXCLUDED: 'map.cleaner.reg.excluded',
             MAP_CLEANER_REG_MATCH: 'map.cleaner.reg.match',
             MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
-            MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian'
+            MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
+            CLAN_BATTLE_PLACE: 'clan.battle.place.remote',
+            ITEMS_TO_SELL: 'items.sell',
+            ITEMS_TO_SPLIT: 'items.split',
+            ITEMS_TO_STORE: 'items.store'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -1303,6 +1307,107 @@ window.setTimeout(function () {
         }
     };
 
+    var BackpackCleanerV2 = {
+        _itemsToSellByDefault: [
+            '天寒手镯', '天寒戒', '天寒项链',
+            '钢剑', '长剑', '单刀', '竹剑', '匕首', '鬼头刀', '长鞭', '木棍', '逆钩匕', '羊角匕', '木刀', '木叉', '木锤', '金刚杖',
+            '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
+            '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
+            '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
+            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫', '绣花鞋', '舞蝶彩衫',
+            '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
+            '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
+            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
+            '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
+            '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
+            '废药渣', '废焦丹', '天寒鞋', '天寒匕'
+        ],
+
+        _itemsToSplitByDefault: [
+            '虎皮腰带', '羊毛斗篷', '金丝甲', '红光匕', '沧海护腰', '金丝宝甲衣', '玄武盾', '星河剑',
+            '夜行披风', '破军盾', '玉清棍', '残雪帽', '残雪手镯', '残雪鞋', '貂皮斗篷', '宝玉甲', '生死符',
+            '血屠刀', '残雪项链'
+        ],
+
+        _itemsToStoreByDefault: [],
+
+        async sell (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await sellSpecificItem(items[i]);
+            }
+
+            async function sellSpecificItem (item = new Item()) {
+                let numberInBatch = item.getQuantity() >= 100 ? 100 : (item.getQuantity() >= 50 ? 50 : (item.getQuantity() >= 10 ? 10 : 0));
+                if (numberInBatch) {
+                    await ButtonManager.click(`items sell ${item.getId()}_N_${numberInBatch}`);
+                    log(`${item.getName()} 已卖，数量 ${numberInBatch}`);
+                    item.setQuantity(item.getQuantity() - numberInBatch);
+
+                    await sellSpecificItem(item);
+                } else if (item.getQuantity()) {
+                    await ButtonManager.click(`#${item.getQuantity()} items sell ${item.getId()}`);
+                    log(`${item.getName()} 已卖，数量 ${item.getQuantity()}`);
+                }
+            }
+        },
+
+        getItemsToSell () {
+            let itemListString = System.getVariant(System.keys.ITEMS_TO_SELL);
+            if (!itemListString) {
+                itemListString = BackpackCleanerV2._itemsToSellByDefault.join(',');
+                System.setVariant(System.keys.ITEMS_TO_SELL, itemListString);
+            }
+
+            let items = itemListString.split(',');
+            return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
+        },
+
+        getItems (key, defaultItems) {
+            let itemListString = System.getVariant(key);
+            if (!itemListString) {
+                itemListString = defaultItems.join(',');
+                System.setVariant(key, itemListString);
+            }
+
+            let items = itemListString.split(',');
+            return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
+        },
+
+        getItemListString (key, defaultItems) {
+            return BackpackCleanerV2.getItems(key, defaultItems).map(v => v.getName()).join(',');
+        },
+
+        setItemsToSell (items) {
+            System.setVariant(System.keys.ITEMS_TO_SELL, items);
+        },
+
+        setItemsToSplit (items) {
+            System.setVariant(System.keys.ITEMS_TO_SPLIT, items);
+        },
+
+        setItemsToStore (items) {
+            System.setVariant(System.keys.ITEMS_TO_STORE, items);
+        },
+
+        async split (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
+                log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
+            }
+        },
+
+        async store (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                await ButtonManager.click(`items put_store ${items[i].getId()}`, 180);
+                log(`${items[i].getName()} 已放仓库，数量 ${items[i].getQuantity()}`);
+            }
+        },
+
+        getItemListWithQuantities (items = []) {
+            return items.map(v => v.getName() + '(数量 ' + v.getQuantity() + ')').join('\n');
+        }
+    };
+
     class Direction {
         constructor (description) {
             this._description = description;
@@ -1398,6 +1503,7 @@ window.setTimeout(function () {
 
             battleHappened (message) {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
+                if (!message.get('msg')) return false;
 
                 let text = System.replaceControlCharBlank(message.get('msg'));
 
@@ -1406,10 +1512,9 @@ window.setTimeout(function () {
 
             startBattle (message) {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
+                if (!message.get('msg')) return false;
 
-                let text = System.replaceControlCharBlank(message.get('msg'));
-
-                return text.includes('你对著');
+                return message.get('msg').includes('你对著');
             },
 
             askForHelp (message) {
@@ -2153,7 +2258,7 @@ window.setTimeout(function () {
         _REG_NO_BAIT: '你还没有鱼饵',
 
         async gotoTarget () {
-            $('#id-escape').click();
+            ButtonManager.pressDown('id-escape');
 
             if (await mapLocked()) {
                 await Navigation.move(PathManager.getPathForSpecificEvent('扬州出发钓鱼加玄铁'));
@@ -3126,14 +3231,30 @@ window.setTimeout(function () {
     };
 
     var ClanCombatHelper = {
-        _place: '',
-
         async back () {
             let roomName = Objects.Room.getName();
             let matches = roomName.match(/武林广场(.*)/);
-            let numberOfSteps = parseInt(matches[1]) - 1;
 
-            await Navigation.move(`#${numberOfSteps} w`);
+            let numberOfSteps = parseInt(matches[1]) - 1;
+            if (numberOfSteps) {
+                await Navigation.move(`#${numberOfSteps} w`);
+            }
+
+            let steps = ClanCombatHelper.getBattlePlace().split('-');
+            await Navigation.travelsalWithEvent('武林广场走一遍', function findRightPlace () {
+                return Objects.Room.getEventByName(steps[0]);
+            });
+
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[0]));
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[1]));
+        },
+
+        setBattlePlace (battlePlace) {
+            System.setVariant(System.keys.CLAN_BATTLE_PLACE, battlePlace);
+        },
+
+        getBattlePlace () {
+            return System.getVariant(System.keys.CLAN_BATTLE_PLACE);
         }
     };
 
@@ -3719,13 +3840,12 @@ window.setTimeout(function () {
         async observe (npc) {
             await Objects.Npc.action(npc, '观战');
 
-            log('开始观战时在场人员：', null, Panels.Combat.getCombatInfo);
             for (let i = 0; i < 15; i++) {
                 debugging('战场信息：', null, Panels.Combat.getCombatInfo);
                 await ExecutionManager.wait(500);
             }
 
-            log('结束观战时在场人员：', null, Panels.Combat.getCombatInfo);
+            debugging('结束观战时在场人员：', null, Panels.Combat.getCombatInfo);
         },
 
         async killDirectly (npc) {
@@ -3733,7 +3853,7 @@ window.setTimeout(function () {
             combat.initialize(npc, '杀死');
             await combat.fire();
 
-            log('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
+            debugging('结束战斗时在场人员：', null, Panels.Combat.getCombatInfo);
         },
 
         locateRoomInformation (dragon, message) {
@@ -4003,7 +4123,9 @@ window.setTimeout(function () {
                 '全真教': 'jh 19;#3 s;sw;s;e;n;nw;#4 n;e;w;w;e;n;#3 w;s;n;w;s;n;#5 e;n;s;e;e;w;n;n;s;s;w;w;n;n;w;w;s;s;n;n;w;s;s;n;n;w;#4 n;e;n;#3 s;e;n;n;w;e;e;s;s;n;n;e;n',
                 '古墓': 'jh 20;w;w;s;e;#5 s;sw;sw;s;s;e;w;#4 s',
                 '白驼山': 'jh 21;#4 n;#4 s;nw;s;n;w;n;s;w;nw;e;w;nw;nw;n;w;sw;jh 21;nw;w;w;nw;n;e;w;n;n;w;e;n;n;e;e;w;ne;sw;e;se;nw;w;n;s;s;n;w;w;#4 n;#3 s;#4 e;n;n;e;e;w;w;w;e;n;nw;se;ne;e;w;n;jh 21;nw;ne;ne;sw;n;n;ne;w;e;n;n;w;w',
-                '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s'
+                '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s',
+
+                '武林广场走一遍': '#9 e'
             },
 
             NPC: {
@@ -4966,15 +5088,6 @@ window.setTimeout(function () {
                 ButtonManager.resetAllButtons();
             }
         }, {
-            label: '帮战回位',
-            title: '帮战挂了自动一键走回战场...',
-            id: 'id-gan-fight-back',
-            hidden: true,
-
-            async eventOnClick () {
-                await ClanCombatHelper.back();
-            }
-        }, {
         }, {
             label: '自动跟招',
             title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
@@ -5005,6 +5118,72 @@ window.setTimeout(function () {
                     } else {
                         log('没有合适的地图：' + city);
                     }
+                }
+            }
+        }, {
+        }, {
+            label: '整理包裹',
+            title: '一键卖掉分解背包里不需要的垃圾...',
+
+            async eventOnClick () {
+                let currentView = $('.outtitle').text();
+                await ButtonManager.click('items');
+
+                let itemsToSell = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_SELL, BackpackCleanerV2._itemsToSellByDefault);
+                let itemsToSplit = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_SPLIT, BackpackCleanerV2._itemsToSplitByDefault);
+                let itemsToStore = BackpackCleanerV2.getItems(System.keys.ITEMS_TO_STORE, BackpackCleanerV2._itemsToStoreByDefault);
+                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length) {
+                    window.alert('背包里能处理的都已经处理了。');
+                } else {
+                    let confirmationMessage = '确定处理掉身上的这些物品？';
+                    if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToSell);
+                    if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToSplit);
+                    if (itemsToStore.length) confirmationMessage += '\n\n放仓库：\n' + BackpackCleanerV2.getItemListWithQuantities(itemsToStore);
+
+                    if (window.confirm(confirmationMessage)) {
+                        await BackpackCleanerV2.sell(itemsToSell);
+                        await BackpackCleanerV2.split(itemsToSplit);
+                        await BackpackCleanerV2.store(itemsToStore);
+                    }
+                }
+
+                if (currentView !== '状 态') {
+                    ButtonManager.click('prev');
+                }
+            }
+        }, {
+            label: '卖',
+            title: '设置一键卖的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_SELL, BackpackCleanerV2._itemsToSellByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToSell(answer);
+                }
+            }
+        }, {
+            label: '解',
+            title: '设置需要一键分解的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_SPLIT, BackpackCleanerV2._itemsToSplitByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToSplit(answer);
+                }
+            }
+        }, {
+            label: '仓',
+            title: '设置需要一键放进仓库的物品列表...',
+            width: '24px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackCleanerV2.getItemListString(System.keys.ITEMS_TO_STORE, BackpackCleanerV2._itemsToStoreByDefault));
+                if (answer) {
+                    BackpackCleanerV2.setItemsToStore(answer);
                 }
             }
         }, {
@@ -5125,15 +5304,6 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 ButtonManager.resetAllButtons();
-            }
-        }, {
-            label: '帮战回位',
-            title: '帮战挂了自动一键走回战场...',
-            id: 'id-gan-fight-back',
-            hidden: true,
-
-            async eventOnClick () {
-                await ClanCombatHelper.back();
             }
         }, {
         }, {
@@ -5490,6 +5660,42 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
                 if (answer || answer === '') {
                     TianjianValleyHelper.setRegexExpression4Exclusion(answer);
+                }
+            }
+        }, {
+        }, {
+            label: '回帮战',
+            title: '帮战挂了自动一键由任意武林广场走回战场...',
+            id: 'id-gan-fight-back',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (System.isLocalServer()) {
+                    window.alert('跨服专用功能，本服不适用');
+                    return;
+                }
+
+                if (!ClanCombatHelper.getBattlePlace()) {
+                    $('#id-gan-fight-back-setting').click();
+                } else {
+                    await ClanCombatHelper.back();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置帮战挂了回战场的目标地点...',
+            id: 'id-gan-fight-back-setting',
+            width: '10px',
+
+            async eventOnClick () {
+                let answer = window.prompt('帮战地点是哪里？可以参照以下格式设置...\n\n例子：怒蛟泽-玄阁', ClanCombatHelper.getBattlePlace());
+                if (answer) {
+                    if (answer.split('-').length !== 2) {
+                        window.alert('必须按 怒蛟泽-玄阁 这样的格式，否则无法识别。');
+                    } else {
+                        ClanCombatHelper.setBattlePlace(answer);
+                    }
                 }
             }
         }]
@@ -5871,7 +6077,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '谷',
-            title: '进入冰月谷...',
+            title: '进入冰月谷并自动打到冰月湖心...\n\n注意：中途有短暂等待是为了确保页面加载完毕，请勿重复点击。',
             id: 'id-icemoon-valley',
             width: '38px',
             marginRight: '1px',
@@ -5895,7 +6101,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '壁',
-            title: '一键从任意处到大昭壁画所在地面壁...',
+            title: '一键从任意处到大昭壁画所在地面壁...\n\n注意：此项目已经实现全自动，且中途可以手工停止。',
             width: '38px',
 
             async eventOnClick () {
