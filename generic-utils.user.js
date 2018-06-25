@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.66
+// @version      2.1.67
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -4938,112 +4938,17 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '好',
-            title: '实时监控面板，有特定青龙出现抢杀好人...',
-            id: 'id-dragon-monitor-kill-good',
-            width: '38px',
-            marginRight: '1px',
-
-            eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    DragonMonitor.setKillBadPerson(false);
-                    ButtonManager.resetButtonById('id-dragon-monitor-kill-bad');
-
-                    DragonMonitor.turnOnDragonEventListener();
-                } else {
-                    DragonMonitor.turnOffDragonEventListener();
-                }
-            }
-        }, {
-            label: '坏',
-            title: '实时监控面板，有特定青龙出现抢杀坏人...',
-            id: 'id-dragon-monitor-kill-bad',
-            width: '38px',
-
-            eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    DragonMonitor.setKillBadPerson(true);
-                    ButtonManager.resetButtonById('id-dragon-monitor-kill-good');
-
-                    DragonMonitor.turnOnDragonEventListener();
-                } else {
-                    DragonMonitor.turnOffDragonEventListener();
-                }
-            }
-        }, {
-            label: '设',
-            title: '设置青龙目标...',
-            width: '38px',
-            marginRight: '1px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式确认要监控什么青龙装备。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：轩辕剑碎片|斩龙宝戒\n2. 只需关键字，不需全名：镯|碎片|戒\n3. 支持正则表达式语法', DragonMonitor.getRegKeywords());
-                if (!answer) return;
-
-                DragonMonitor.setRegKeywords(answer);
-            }
-        }, {
-            label: '滤',
-            title: '设置不打的青龙目标...',
-            width: '38px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式 (比如 轩辕剑碎片|镯|斩龙宝戒) 填入不打的青龙关键字。', DragonMonitor.getRegKeywords4ExcludedTargets());
-                if (answer || answer === '') {
-                    DragonMonitor.setRegKeywords4ExcludedTargets(answer);
-                }
-            }
-        }, {
-        }, {
-            label: '飞地图',
-            title: '跑地图...',
-            hidden: true,
-
-            eventOnClick () {
-                let message = '请输入：\n\n地图-目标（少林寺-达摩老祖）或者 地图-房间名（雪亭镇-山坳）';
-                let answer = window.prompt(message);
-
-                if (answer) {
-                    let info = answer.split('-');
-                    let city = info[0];
-                    let target = info[1];
-                    if (PathManager.getTraversalPathByCity(city)) {
-                        Navigation.traversal(city, target);
-                    } else {
-                        log('没有合适的地图：' + city);
-                    }
-                }
-            }
-        }, {
-        }, {
-            label: '抢杀',
-            title: '抢杀某个指定目标...',
-            id: 'id-killer',
-            hidden: true,
+            label: '自动打坐',
+            title: '此开关打开时，打坐结束事件会自动触发继续打坐。',
+            id: 'id-continue-dazuo',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    let name = window.prompt('请输入要杀的目标名字。');
-                    if (name) {
-                        KillerHelper.setTarget(name);
-                        JobManager.getJob(this.id).start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
-                    }
+                    MonitorCenter.Dazuo.turnOn();
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    MonitorCenter.Dazuo.turnOff();
                 }
             }
-        }, {
-            label: '检测状态',
-            title: '自动检测状态...',
-            id: 'id-auto-status-reset',
-            hidden: true,
-
-            eventOnClick () {
-                ButtonManager.resetAllButtons();
-            }
-        }, {
         }, {
             label: '自动跟招',
             title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
@@ -5185,18 +5090,6 @@ window.setTimeout(function () {
                     MonitorCenter.Sleep.turnOn();
                 } else {
                     MonitorCenter.Sleep.turnOff();
-                }
-            }
-        }, {
-            label: '自动打坐',
-            title: '点下时打坐结束事件会自动触发继续打坐。',
-            id: 'id-continue-dazuo',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    MonitorCenter.Dazuo.turnOn();
-                } else {
-                    MonitorCenter.Dazuo.turnOff();
                 }
             }
         }, {
@@ -5649,6 +5542,63 @@ window.setTimeout(function () {
                     } else {
                         ClanCombatHelper.setBattlePlace(answer);
                     }
+                }
+            }
+        }, {
+        }, {
+            label: '好',
+            title: '实时监控面板，有特定青龙出现抢杀好人...',
+            id: 'id-dragon-monitor-kill-good',
+            width: '38px',
+            marginRight: '1px',
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    DragonMonitor.setKillBadPerson(false);
+                    ButtonManager.resetButtonById('id-dragon-monitor-kill-bad');
+
+                    DragonMonitor.turnOnDragonEventListener();
+                } else {
+                    DragonMonitor.turnOffDragonEventListener();
+                }
+            }
+        }, {
+            label: '坏',
+            title: '实时监控面板，有特定青龙出现抢杀坏人...',
+            id: 'id-dragon-monitor-kill-bad',
+            width: '38px',
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    DragonMonitor.setKillBadPerson(true);
+                    ButtonManager.resetButtonById('id-dragon-monitor-kill-good');
+
+                    DragonMonitor.turnOnDragonEventListener();
+                } else {
+                    DragonMonitor.turnOffDragonEventListener();
+                }
+            }
+        }, {
+            label: '设',
+            title: '设置青龙目标...',
+            width: '38px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式确认要监控什么青龙装备。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：轩辕剑碎片|斩龙宝戒\n2. 只需关键字，不需全名：镯|碎片|戒\n3. 支持正则表达式语法', DragonMonitor.getRegKeywords());
+                if (!answer) return;
+
+                DragonMonitor.setRegKeywords(answer);
+            }
+        }, {
+            label: '滤',
+            title: '设置不打的青龙目标...',
+            width: '38px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式 (比如 轩辕剑碎片|镯|斩龙宝戒) 填入不打的青龙关键字。', DragonMonitor.getRegKeywords4ExcludedTargets());
+                if (answer || answer === '') {
+                    DragonMonitor.setRegKeywords4ExcludedTargets(answer);
                 }
             }
         }]
