@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.61
+// @version      2.1.62
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -759,13 +759,13 @@ window.setTimeout(function () {
         turnOnClanTaskListener () {
             InterceptorRegistry.register(new Interceptor('帮派申请任务', GenericTaskManager.newClanTaskArrived, GenericTaskManager.addressClanTask, 'main_msg', 'text'));
             InterceptorRegistry.register(new Interceptor('帮派自动继续任务', GenericTaskManager.clanTaskCompletedMessageReceived, GenericTaskManager.triggerNewClanTask, 'main_msg', 'text'));
-            InterceptorRegistry.register(new Interceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton));
+            InterceptorRegistry.register(new Interceptor('帮派任务过量', GenericTaskManager.clanTaskTooMuchMessageReceived, GenericTaskManager.resetClanTaskButton, 'main_msg'));
         },
 
         turnOnMasterTaskListener () {
             InterceptorRegistry.register(new Interceptor('师门申请任务', GenericTaskManager.newMasterTaskArrived, GenericTaskManager.addressMasterTask, 'main_msg', 'text'));
             InterceptorRegistry.register(new Interceptor('师门自动继续任务', GenericTaskManager.masterTaskCompletedMessageReceived, GenericTaskManager.triggerNewMasterTask, 'main_msg', 'text'));
-            InterceptorRegistry.register(new Interceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton, 'main_msg', 'text'));
+            InterceptorRegistry.register(new Interceptor('师门任务过量', GenericTaskManager.masterTaskTooMuchMessageReceived, GenericTaskManager.resetMasterTaskButton, 'main_msg'));
         },
 
         turnOffClanTaskListener () {
@@ -1629,6 +1629,45 @@ window.setTimeout(function () {
 
         teamChat (command) {
             ExecutionManager.execute(`clickButton('team chat ${command}', 0)`);
+        }
+    };
+
+    var MonitorCenter = {
+        Sleep: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('睡床监控', MonitorCenter.Sleep.done, MonitorCenter.Sleep.continue, 'main_msg'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('睡床监控');
+            },
+
+            done (message) {
+                return message.get('msg') === '[1;33m你从寒玉床上爬起，结束了这次练功。[2;37;0m';
+            },
+
+            continue (message) {
+                log('睡床结束，自动继续...');
+            }
+        },
+
+        Dazuo: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('打坐监控', MonitorCenter.Dazuo.done, MonitorCenter.Dazuo.continue, 'main_msg'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('打坐监控');
+            },
+
+            done (message) {
+                return message.get('msg') === '[1;33m你打坐完毕，收起全身的真气游走，站起身来[2;37;0m';
+            },
+
+            continue (message) {
+                log('打坐监控条件被触发，自动继续打坐...');
+                ButtonManager.click('exercise');
+            }
         }
     };
 
@@ -4323,8 +4362,6 @@ window.setTimeout(function () {
                     '茅山-山道': {
                         '野猪': 'jh 29;n'
                     },
-                    '茅山-三清宫厨房': 'jh 29;#4 n;#3 event_1_60035830;event_1_65661209;#7 n;event_1_98579273;e',
-                    '茅山-三清宫储藏室。': 'jh 29;#4 n;#3 event_1_60035830;event_1_65661209;#7 n;event_1_98579273;n;e',
                     '桃花岛-兵器室': 'jh 30;#10 n;w;w',
                     '桃花岛-青草地': 'jh 30;#13 n;e;e',
                     '铁雪山庄-练功室': 'jh 31;#3 n;#4 w;#4 n;w',
@@ -4988,7 +5025,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-        }, {
             label: '抢杀',
             title: '抢杀某个指定目标...',
             id: 'id-killer',
@@ -5008,8 +5044,33 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '自动睡床',
+            title: '点下时睡床结束事件会自动触发继续睡床。',
+            id: 'id-continue-sleep',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Sleep.turnOn();
+                } else {
+                    MonitorCenter.Sleep.turnOff();
+                }
+            }
+        }, {
+            label: '自动打坐',
+            title: '点下时打坐结束事件会自动触发继续打坐。',
+            id: 'id-continue-dazuo',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Dazuo.turnOn();
+                } else {
+                    MonitorCenter.Dazuo.turnOff();
+                }
+            }
+        }, {
+        }, {
             label: '自动重连',
-            title: '点下按钮会在页面断开连接后一分钟自动重新刷新页面。',
+            title: '点下按钮会在号被顶后一分钟自动重新刷新页面。\n\n注意：本功能慎用，比如当两个窗口同时开启本功能时会出现互相顶号的行为。',
             id: 'id-page-refresh',
 
             async eventOnClick () {
