@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.67
+// @version      2.1.68
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -122,6 +122,7 @@ window.setTimeout(function () {
             ITEMS_TO_SELL: 'packing.sell',
             ITEMS_TO_SPLIT: 'packing.split',
             ITEMS_TO_STORE: 'packing.store',
+            ITEMS_TO_USE: 'packing.use',
             MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
             PATH_CUSTOMIZED: 'customizations.user.path'
         },
@@ -1269,7 +1270,8 @@ window.setTimeout(function () {
             '血屠刀', '残雪项链'
         ].join(','),
 
-        itemsToStoreByDefault: [].join(','),
+        itemsToStoreByDefault: ['狗年礼券', '百宝令'].join(','),
+        itemsToUseByDefault: ['大还丹'].join(','),
 
         async sell (items = []) {
             for (let i = 0; i < items.length; i++) {
@@ -1319,6 +1321,10 @@ window.setTimeout(function () {
             System.setVariant(System.keys.ITEMS_TO_STORE, itemListString);
         },
 
+        setItemsToUse (itemListString) {
+            System.setVariant(System.keys.ITEMS_TO_USE, itemListString);
+        },
+
         async split (items = []) {
             for (let i = 0; i < items.length; i++) {
                 await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
@@ -1330,6 +1336,20 @@ window.setTimeout(function () {
             for (let i = 0; i < items.length; i++) {
                 await ButtonManager.click(`items put_store ${items[i].getId()}`, 180);
                 log(`${items[i].getName()} 已放仓库，数量 ${items[i].getQuantity()}`);
+            }
+        },
+
+        async use (items = []) {
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].getQuantity() > 50) {
+                    let item = Panels.Backpack.getItemsByName(items[i].getName())[0];
+                    await ButtonManager.click(`items info ${item.getId()}`);
+                    await ButtonManager.click('use_all', 180);
+                } else {
+                    await ButtonManager.click(`#${items[i].getQuantity()} items use ${items[i].getId()}`, 180);
+                }
+
+                log(`${items[i].getName()} 已使用，数量 ${items[i].getQuantity()}`);
             }
         },
 
@@ -2938,6 +2958,10 @@ window.setTimeout(function () {
                     let item = new Item(System.replaceControlCharBlank(values[1]), values[0], parseInt(values[2]));
                     return item;
                 });
+            },
+
+            getItemsByName (name) {
+                return Panels.Backpack.getItems().filter(v => v.getName() === name);
             },
 
             getItemQuantityByName (name = '') {
@@ -4929,6 +4953,7 @@ window.setTimeout(function () {
                 }
             }
         }, {
+        }, {
             label: '自动点完',
             title: '凌晨 5:55 把如下 VIP 点点点完\n\n1. 正邪\n2. 逃犯\n3. 打榜\n4. 师门任务\n5. 帮派任务\n6. 谜题\n7. 闯楼奖励\n8. 李火狮礼券积分谜题卡\n9. 每日一次任务\n10. 排行榜奖励\n\n注意：周日挂着可以在周一凌晨多领一次新礼包。',
             id: 'id-leftover-tasks',
@@ -4936,7 +4961,6 @@ window.setTimeout(function () {
             eventOnClick () {
                 ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
             }
-        }, {
         }, {
             label: '自动打坐',
             title: '此开关打开时，打坐结束事件会自动触发继续打坐。',
@@ -5760,18 +5784,21 @@ window.setTimeout(function () {
                 let itemsToSell = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault);
                 let itemsToSplit = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault);
                 let itemsToStore = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault);
-                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length) {
+                let itemsToUse = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_USE, BackpackHelper.itemsToUseByDefault);
+                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length && !itemsToUse.length) {
                     window.alert('背包里能处理的都已经处理了。');
                 } else {
                     let confirmationMessage = '确定处理掉身上的这些物品？';
                     if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackHelper.getItemListWithQuantities(itemsToSell);
                     if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackHelper.getItemListWithQuantities(itemsToSplit);
                     if (itemsToStore.length) confirmationMessage += '\n\n放仓库：\n' + BackpackHelper.getItemListWithQuantities(itemsToStore);
+                    if (itemsToUse.length) confirmationMessage += '\n\n使用：\n' + BackpackHelper.getItemListWithQuantities(itemsToUse);
 
                     if (window.confirm(confirmationMessage)) {
                         await BackpackHelper.sell(itemsToSell);
                         await BackpackHelper.split(itemsToSplit);
                         await BackpackHelper.store(itemsToStore);
+                        await BackpackHelper.use(itemsToUse);
                     }
                 }
 
@@ -5782,7 +5809,7 @@ window.setTimeout(function () {
         }, {
             label: '卖',
             title: '设置一键卖的物品列表...',
-            width: '24px',
+            width: '38px',
             marginRight: '1px',
 
             async eventOnClick () {
@@ -5794,8 +5821,7 @@ window.setTimeout(function () {
         }, {
             label: '解',
             title: '设置需要一键分解的物品列表...',
-            width: '24px',
-            marginRight: '1px',
+            width: '38px',
 
             async eventOnClick () {
                 let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault));
@@ -5804,14 +5830,26 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '仓',
+            label: '储',
             title: '设置需要一键放进仓库的物品列表...',
-            width: '24px',
+            width: '38px',
+            marginRight: '1px',
 
             async eventOnClick () {
                 let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault));
                 if (answer) {
                     BackpackHelper.setItemsToStore(answer);
+                }
+            }
+        }, {
+            label: '用',
+            title: '设置需要一键全部使用的物品列表...',
+            width: '38px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键全部使用的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_USE, BackpackHelper.itemsToUseByDefault));
+                if (answer) {
+                    BackpackHelper.setItemsToUse(answer);
                 }
             }
         }, {
@@ -6031,9 +6069,9 @@ window.setTimeout(function () {
 
                         GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
                         await GenericMapCleaner.start();
-                    } else {
-                        ButtonManager.resetButtonById(this.id);
                     }
+
+                    ButtonManager.resetButtonById(this.id);
                 } else {
                     GenericMapCleaner.stop();
                 }
@@ -6042,15 +6080,16 @@ window.setTimeout(function () {
             label: '壁',
             title: '一键从任意处到大昭壁画所在地面壁...\n\n注意：此项目已经实现全自动，且中途可以手工停止。',
             width: '38px',
+            id: 'id-dazhao-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this) && window.confirm('寻找壁画路径是动态的所以耗时看脸，确定开始？')) {
                     await FrescoHelper.startTrying();
+
+                    ButtonManager.resetButtonById(this.id);
                 } else {
                     FrescoHelper.stopTrying();
                 }
-
-                ButtonManager.resetButtonById(this.id);
             }
         }, {
         }, {
@@ -7125,7 +7164,8 @@ window.setTimeout(function () {
         HelperUiManager.drawControlCheckboxes();
         HelperUiManager.drawMasterSwitch();
 
-        $('#id-leftover-tasks').click();
+        ButtonManager.pressDown('id-leftover-tasks');
+        ButtonManager.pressDown('id-continue-dazuo');
         $('#测试中功能').click();
 
         System.loadLastButtonStatus();
