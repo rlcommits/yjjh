@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.65
+// @version      2.1.66
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -119,9 +119,11 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
             MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
             CLAN_BATTLE_PLACE: 'clan.battle.place.remote',
-            ITEMS_TO_SELL: 'items.sell',
-            ITEMS_TO_SPLIT: 'items.split',
-            ITEMS_TO_STORE: 'items.store'
+            ITEMS_TO_SELL: 'packing.sell',
+            ITEMS_TO_SPLIT: 'packing.split',
+            ITEMS_TO_STORE: 'packing.store',
+            MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
+            PATH_CUSTOMIZED: 'customizations.user.path'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -1245,68 +1247,6 @@ window.setTimeout(function () {
         }
     };
 
-    var BackpackCleaner = {
-        _itemsToSell: [
-            '天寒手镯', '天寒戒', '天寒项链',
-            '钢剑', '长剑', '单刀', '竹剑', '匕首', '鬼头刀', '长鞭', '木棍', '逆钩匕', '羊角匕', '木刀', '木叉', '木锤', '金刚杖',
-            '铁戒', '竹刀', '钢刀', '七星剑', '竹鞭', '木剑', '长枪', '牧羊鞭', '白棋子', '禅杖', '斩空刀', '木枪', '新月棍', '金弹子',
-            '破披风', '牛皮带', '麻带', '长斗篷', '丝质披风', '锦缎腰带', '青布袍', '牛皮靴', '梅花匕', '八角锤', '阿拉伯弯刀',
-            '木盾', '铁盾', '藤甲盾', '青铜盾', '水烟阁司事帽', '水烟阁司事褂', '水烟阁武士氅', '鲜红锦衣', '鲜红金乌冠',
-            '鞶革', '软甲衣', '铁甲', '蓑衣', '布衣', '军袍', '银丝甲', '天寒帽', '重甲', '轻罗绸衫', '绣花鞋', '舞蝶彩衫',
-            '鹿皮小靴', '纱裙', '绣花小鞋', '细剑', '柴刀', '精铁甲', '白蟒鞭', '草鞋', '草帽', '羊毛裙', '粗磁大碗', '丝衣',
-            '树枝', '鲤鱼', '鲫鱼', '破烂衣服', '水草', '兔肉', '白色长袍', '草莓', '闪避基础', '水密桃', '菠菜粉条', '大光明经',
-            '莲蓬', '柴', '砍刀', '大理雪梨', '羊肉串', '瑶琴', '粗布衣',
-            '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
-            '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
-            '废药渣', '废焦丹', '天寒鞋', '天寒匕'
-        ],
-
-        _itemsToSplit: [
-            '虎皮腰带', '羊毛斗篷', '金丝甲', '红光匕', '沧海护腰', '金丝宝甲衣', '玄武盾', '星河剑',
-            '夜行披风', '破军盾', '玉清棍', '残雪帽', '残雪手镯', '残雪鞋', '貂皮斗篷', '宝玉甲', '生死符',
-            '血屠刀', '残雪项链'
-        ],
-
-        async sell (items = []) {
-            for (let i = 0; i < items.length; i++) {
-                await sellSpecificItem(items[i]);
-            }
-
-            async function sellSpecificItem (item = new Item()) {
-                let numberInBatch = item.getQuantity() >= 100 ? 100 : (item.getQuantity() >= 50 ? 50 : (item.getQuantity() >= 10 ? 10 : 0));
-                if (numberInBatch) {
-                    await ButtonManager.click(`items sell ${item.getId()}_N_${numberInBatch}`);
-                    log(`${item.getName()} 已卖，数量 ${numberInBatch}`);
-                    item.setQuantity(item.getQuantity() - numberInBatch);
-
-                    await sellSpecificItem(item);
-                } else if (item.getQuantity()) {
-                    await ButtonManager.click(`#${item.getQuantity()} items sell ${item.getId()}`);
-                    log(`${item.getName()} 已卖，数量 ${item.getQuantity()}`);
-                }
-            }
-        },
-
-        getItemsToSell () {
-            return Panels.Backpack.getItems('items').filter(v => BackpackCleaner._itemsToSell.includes(v.getName()));
-        },
-
-        getItemsToSplit () {
-            return Panels.Backpack.getItems('items').filter(v => BackpackCleaner._itemsToSplit.includes(v.getName()));
-        },
-
-        async split (items = []) {
-            for (let i = 0; i < items.length; i++) {
-                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
-                log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
-            }
-        },
-
-        getItemListWithQuantities (items = []) {
-            return items.map(v => v.getName() + '(数量 ' + v.getQuantity() + ')').join('\n');
-        }
-    };
-
     var BackpackHelper = {
         itemsToSellByDefault: [
             '天寒手镯', '天寒戒', '天寒项链',
@@ -1321,15 +1261,15 @@ window.setTimeout(function () {
             '道德经', '古铜缎子袄裙', '彩巾', '彩衣', '拐杖', '银戒', '彩靴', '彩帽', '彩带', '彩镯', '黑色棋子', '白色棋子', '黑袍', '白袍',
             '水蜜桃', '木戟', '桃符纸', '铁斧', '硫磺', '鸡叫草', '木钩', '玉蜂浆', '天山雪莲', '鹿皮手套', '飞镖', '铁项链', '刀法基础', '蛋糕',
             '废药渣', '废焦丹', '天寒鞋', '天寒匕'
-        ],
+        ].join(','),
 
         itemsToSplitByDefault: [
             '虎皮腰带', '羊毛斗篷', '金丝甲', '红光匕', '沧海护腰', '金丝宝甲衣', '玄武盾', '星河剑',
             '夜行披风', '破军盾', '玉清棍', '残雪帽', '残雪手镯', '残雪鞋', '貂皮斗篷', '宝玉甲', '生死符',
             '血屠刀', '残雪项链'
-        ],
+        ].join(','),
 
-        itemsToStoreByDefault: [],
+        itemsToStoreByDefault: [].join(','),
 
         async sell (items = []) {
             for (let i = 0; i < items.length; i++) {
@@ -1358,25 +1298,25 @@ window.setTimeout(function () {
             return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
         },
 
-        getExistingSetting (key, defaultItems) {
+        getExistingSetting (key, defaultSetting) {
             let setting = System.getVariant(key);
             if (!setting) {
-                System.setVariant(key, defaultItems);
+                System.setVariant(key, defaultSetting);
             }
 
             return System.getVariant(key);
         },
 
-        setItemsToSell (items) {
-            System.setVariant(System.keys.ITEMS_TO_SELL, items);
+        setItemsToSell (itemListString) {
+            System.setVariant(System.keys.ITEMS_TO_SELL, itemListString);
         },
 
-        setItemsToSplit (items) {
-            System.setVariant(System.keys.ITEMS_TO_SPLIT, items);
+        setItemsToSplit (itemListString) {
+            System.setVariant(System.keys.ITEMS_TO_SPLIT, itemListString);
         },
 
-        setItemsToStore (items) {
-            System.setVariant(System.keys.ITEMS_TO_STORE, items);
+        setItemsToStore (itemListString) {
+            System.setVariant(System.keys.ITEMS_TO_STORE, itemListString);
         },
 
         async split (items = []) {
@@ -1738,11 +1678,12 @@ window.setTimeout(function () {
             },
 
             done (message) {
-                return message.get('msg') === '[1;33m你从寒玉床上爬起，结束了这次练功。[2;37;0m';
+                return message.get('msg').startsWith('[1;33m你从寒玉床上爬起，结束了这次练功。');
             },
 
             continue (message) {
                 log('睡床结束，自动继续...');
+                ButtonManager.click('sleep_hanyuchuang');
             }
         },
 
@@ -1756,7 +1697,7 @@ window.setTimeout(function () {
             },
 
             done (message) {
-                return message.get('msg') === '[1;33m你打坐完毕，收起全身的真气游走，站起身来[2;37;0m';
+                return message.get('msg').startsWith('[1;33m你打坐完毕，收起全身的真气游走，站起身来');
             },
 
             continue (message) {
@@ -3370,6 +3311,23 @@ window.setTimeout(function () {
         }
     };
 
+    var MapFragmentHelper = {
+        _retry: new Retry(60 * 1000),
+
+        getThreshold () {
+            let threshold = System.getVariant(System.keys.MAP_FRAGMENT_THRESHOLD);
+            if (!threshold) {
+                System.setVariant(System.keys.MAP_FRAGMENT_THRESHOLD, 30000000);
+            }
+
+            return System.getVariant(System.keys.MAP_FRAGMENT_THRESHOLD);
+        },
+
+        setThreshold (threshold) {
+            System.setVariant(System.keys.MAP_FRAGMENT_THRESHOLD, threshold);
+        }
+    };
+
     var TianjianValleyHelper = {
         getRegexExpression4Match () {
             if (!System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN)) {
@@ -4055,6 +4013,14 @@ window.setTimeout(function () {
     };
 
     var PathManager = {
+        setCustomizedPath (path) {
+            System.setVariant(System.keys.PATH_CUSTOMIZED, path);
+        },
+
+        getCustomizedPath () {
+            return System.getVariant(System.keys.PATH_CUSTOMIZED);
+        },
+
         getTraversalPathByCity (city) {
             return PathManager._PATHS.TRAVERSAL[city];
         },
@@ -5092,6 +5058,33 @@ window.setTimeout(function () {
         subject: '测试中功能',
 
         buttons: [{
+            label: '预设地',
+            title: '可以预设一个常去地点，以后每次点击这个按钮自动到这个地方...',
+            width: '60px',
+            marginRight: '1px',
+
+            eventOnClick () {
+                let path = PathManager.getCustomizedPath();
+                if (!path) {
+                    $('#id-customized-path-setting').click();
+                } else {
+                    Navigation.move(path);
+                }
+            }
+        }, {
+            label: '.',
+            title: '可以预设一个常去地点，以后每次点击这个按钮自动到这个地方',
+            width: '10px',
+            id: 'id-customized-path-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入对应路径：\n\n例子雪亭城隍庙：jh 1;e;e', PathManager.getCustomizedPath());
+                if (answer) {
+                    PathManager.setCustomizedPath(answer);
+                }
+            }
+        }, {
+        }, {
             label: '飞地图',
             title: '跑地图...',
 
@@ -5112,69 +5105,39 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '整理包裹',
-            title: '一键卖掉分解背包里不需要的垃圾...',
+            label: '地图碎片',
+            title: '一键走到地图碎片所在地室且定时巡逻，在设定好的血量阈值达到时发起战斗...',
+            id: 'id-map-fragments',
+            hidden: true,
 
-            async eventOnClick () {
-                let currentView = $('.outtitle').text();
-                await ButtonManager.click('items');
-
-                let itemsToSell = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault);
-                let itemsToSplit = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault);
-                let itemsToStore = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault);
-                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length) {
-                    window.alert('背包里能处理的都已经处理了。');
-                } else {
-                    let confirmationMessage = '确定处理掉身上的这些物品？';
-                    if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackHelper.getItemListWithQuantities(itemsToSell);
-                    if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackHelper.getItemListWithQuantities(itemsToSplit);
-                    if (itemsToStore.length) confirmationMessage += '\n\n放仓库：\n' + BackpackHelper.getItemListWithQuantities(itemsToStore);
-
-                    if (window.confirm(confirmationMessage)) {
-                        await BackpackHelper.sell(itemsToSell);
-                        await BackpackHelper.split(itemsToSplit);
-                        await BackpackHelper.store(itemsToStore);
-                    }
-                }
-
-                if (currentView !== '状 态') {
-                    ButtonManager.click('prev');
+            eventOnClick () {
+                if (window.confirm('确定去西安云远寺地室，且开始挂机地图碎片？')) {
+                    Navigation.move(PathManager.getPathForSpecificEvent('云远寺地室'));
                 }
             }
         }, {
-            label: '卖',
-            title: '设置一键卖的物品列表...',
-            width: '24px',
+            label: '时',
+            title: '设置地图碎片挂机发起战斗的时机',
+            width: '38px',
             marginRight: '1px',
+            hidden: true,
 
-            async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault));
-                if (answer) {
-                    BackpackHelper.setItemsToSell(answer);
+            eventOnClick () {
+                let answer = window.prompt('请输入目标血量小于多少时发起战斗。比如 30000000', MapFragmentHelper.getThreshold());
+                if (parseInt(answer)) {
+                    MapFragmentHelper.setThreshold(parseInt(answer));
                 }
             }
         }, {
-            label: '解',
-            title: '设置需要一键分解的物品列表...',
-            width: '24px',
+            label: '交',
+            title: '设置是否监测开地图事件且第一时间交碎片...',
+            id: 'id-map-fragments-auto-delivery',
+            width: '38px',
             marginRight: '1px',
+            hidden: true,
 
-            async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault));
-                if (answer) {
-                    BackpackHelper.setItemsToSplit(answer);
-                }
-            }
-        }, {
-            label: '仓',
-            title: '设置需要一键放进仓库的物品列表...',
-            width: '24px',
+            eventOnClick () {
 
-            async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault));
-                if (answer) {
-                    BackpackHelper.setItemsToStore(answer);
-                }
             }
         }, {
         }, {
@@ -5214,7 +5177,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '自动睡床',
-            title: '点下时睡床结束事件会自动触发继续睡床。',
+            title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：本版本未经测试',
             id: 'id-continue-sleep',
 
             async eventOnClick () {
@@ -5815,10 +5778,8 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '合',
+            label: '合成宝石',
             title: '按提示操作可极大简化合成宝石步骤...\n\n注意：\n1. 只处理背包里的宝石，仓库里的不动\n2. 只合成到完美级别，避免不预期的过度合成',
-            width: '38px',
-            marginRight: '1px',
 
             async eventOnClick () {
                 let currentView = $('.outtitle').text();
@@ -5838,31 +5799,69 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '整',
+        }, {
+            label: '整理包裹',
             title: '一键卖掉分解背包里不需要的垃圾...',
-            width: '38px',
 
             async eventOnClick () {
                 let currentView = $('.outtitle').text();
                 await ButtonManager.click('items');
 
-                let itemsToSell = BackpackCleaner.getItemsToSell();
-                let itemsToSplit = BackpackCleaner.getItemsToSplit();
-                if (!itemsToSell.length && !itemsToSplit.length) {
+                let itemsToSell = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault);
+                let itemsToSplit = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault);
+                let itemsToStore = BackpackHelper.getAvailableItems(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault);
+                if (!itemsToSell.length && !itemsToSplit.length && !itemsToStore.length) {
                     window.alert('背包里能处理的都已经处理了。');
                 } else {
                     let confirmationMessage = '确定处理掉身上的这些物品？';
-                    if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackCleaner.getItemListWithQuantities(itemsToSell);
-                    if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackCleaner.getItemListWithQuantities(itemsToSplit);
+                    if (itemsToSell.length) confirmationMessage += '\n\n卖：\n' + BackpackHelper.getItemListWithQuantities(itemsToSell);
+                    if (itemsToSplit.length) confirmationMessage += '\n\n分解：\n' + BackpackHelper.getItemListWithQuantities(itemsToSplit);
+                    if (itemsToStore.length) confirmationMessage += '\n\n放仓库：\n' + BackpackHelper.getItemListWithQuantities(itemsToStore);
 
                     if (window.confirm(confirmationMessage)) {
-                        await BackpackCleaner.sell(itemsToSell);
-                        await BackpackCleaner.split(itemsToSplit);
+                        await BackpackHelper.sell(itemsToSell);
+                        await BackpackHelper.split(itemsToSplit);
+                        await BackpackHelper.store(itemsToStore);
                     }
                 }
 
                 if (currentView !== '状 态') {
                     ButtonManager.click('prev');
+                }
+            }
+        }, {
+            label: '卖',
+            title: '设置一键卖的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault));
+                if (answer) {
+                    BackpackHelper.setItemsToSell(answer);
+                }
+            }
+        }, {
+            label: '解',
+            title: '设置需要一键分解的物品列表...',
+            width: '24px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault));
+                if (answer) {
+                    BackpackHelper.setItemsToSplit(answer);
+                }
+            }
+        }, {
+            label: '仓',
+            title: '设置需要一键放进仓库的物品列表...',
+            width: '24px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault));
+                if (answer) {
+                    BackpackHelper.setItemsToStore(answer);
                 }
             }
         }, {
