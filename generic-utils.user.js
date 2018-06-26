@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.69
+// @version      2.1.70
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -124,7 +124,9 @@ window.setTimeout(function () {
             ITEMS_TO_STORE: 'packing.store',
             ITEMS_TO_USE: 'packing.use',
             MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
-            PATH_CUSTOMIZED: 'customizations.user.path'
+            PATH_CUSTOMIZED: 'customizations.user.path',
+            EQUIPMENT_COMBAT: 'equipment.combat',
+            EQUIPMENT_STUDY: 'equipment.study'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -714,6 +716,34 @@ window.setTimeout(function () {
                 let info = place.split('-');
                 return new Npc(info[info.length - 1]);
             }
+        }
+    };
+
+    var EquipmentHelper = {
+        combatItemsByDefault: '',
+        studyItemsByDefault: '',
+
+        combat: ['九天龙吟剑', '天罡拳套'].join(','),
+        study: ['迷幻经纶'].join(','),
+
+        switch2CombatMode () {
+            window.alert('本功能尚未完成');
+        },
+
+        quitCombatMode () {
+
+        },
+
+        switch2StudyMode () {
+            window.alert('本功能尚未完成');
+        },
+
+        quitStudyMode () {
+
+        },
+
+        getExistingSetting (key, defaultValue) {
+
         }
     };
 
@@ -1695,10 +1725,12 @@ window.setTimeout(function () {
         Sleep: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('睡床监控', MonitorCenter.Sleep.done, MonitorCenter.Sleep.continue, 'main_msg'));
+                InterceptorRegistry.register(new Interceptor('睡床失败检测', MonitorCenter.Sleep.failed2Sleep, MonitorCenter.Sleep.retry, 'notice', 'notify_fail'));
             },
 
             turnOff () {
                 InterceptorRegistry.unregister('睡床监控');
+                InterceptorRegistry.unregister('睡床失败检测');
             },
 
             done (message) {
@@ -1706,8 +1738,16 @@ window.setTimeout(function () {
             },
 
             continue (message) {
-                log('睡床结束，自动继续...');
+                log('睡床自动继续...');
                 ButtonManager.click('sleep_hanyuchuang');
+            },
+
+            failed2Sleep (message) {
+                return message.get('msg').startsWith('这儿没有寒玉床');
+            },
+
+            retry (message) {
+                window.setTimeout(MonitorCenter.Sleep.continue, 5 * 60 * 1000);
             }
         },
 
@@ -3243,6 +3283,8 @@ window.setTimeout(function () {
         _maxEnforce: true,
 
         initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true) {
+            debugging('初始化地图清理模式...');
+
             GenericMapCleaner._stop = false;
             GenericMapCleaner._travelsalByGivenPath = travelsalByGivenPath;
             GenericMapCleaner._path = path;
@@ -3257,6 +3299,8 @@ window.setTimeout(function () {
         },
 
         async _killAndMove () {
+            debugging('开始地图清理...');
+
             let npcs = GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter);
             if (npcs.length) {
                 let combat = new Combat(200, false, !GenericMapCleaner._maxEnforce);
@@ -5009,6 +5053,64 @@ window.setTimeout(function () {
                 }
             }
         }, {
+            label: '战斗装',
+            title: '按顺序装备预设的战斗装备，加力...\n\n注意：在战斗中临时切换也有效。',
+            id: 'id-equipment-for-combat-v2',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    EquipmentHelper.switch2CombatMode();
+
+                    EnforceHelper.maximizeEnforce();
+                    ButtonManager.resetButtonById('id-equipment-for-study-v2');
+                } else {
+                    EquipmentHelper.quitCombatMode();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置战斗装备...',
+            width: '10px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按顺序输入战斗模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_COMBAT, EquipmentHelper.combatItemsByDefault));
+                if (answer) {
+                    EquipmentHelper.setItemsForCombat(answer);
+                }
+            }
+        }, {
+            label: '学习装',
+            title: '切换到悟性最高的装备...\n\n注意：在战斗中临时切换也有效。',
+            width: '60px',
+            marginRight: '1px',
+            id: 'id-equipment-for-study-v2',
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    EquipmentHelper.switch2StudyMode();
+
+                    EnforceHelper.maximizeEnforce();
+                    ButtonManager.resetButtonById('id-equipment-for-study-v2');
+                } else {
+                    EquipmentHelper.quitCombatMode();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置学习装备...',
+            width: '10px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按顺序输入学习模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_STUDY, EquipmentHelper.studyItemsByDefault));
+                if (answer) {
+                    EquipmentHelper.setItemsForCombat(answer);
+                }
+            }
+        }, {
         }, {
             label: '地图碎片',
             title: '一键走到地图碎片所在地室且定时巡逻，在设定好的血量阈值达到时发起战斗...',
@@ -5082,7 +5184,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '自动睡床',
-            title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：本版本未经测试',
+            title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：在师门才可生效。',
             id: 'id-continue-sleep',
 
             async eventOnClick () {
@@ -5804,10 +5906,10 @@ window.setTimeout(function () {
                     if (itemsToUse.length) confirmationMessage += '\n\n使用：\n' + BackpackHelper.getItemListWithQuantities(itemsToUse);
 
                     if (window.confirm(confirmationMessage)) {
-                        await BackpackHelper.sell(itemsToSell);
-                        await BackpackHelper.split(itemsToSplit);
                         await BackpackHelper.store(itemsToStore);
                         await BackpackHelper.use(itemsToUse);
+                        await BackpackHelper.sell(itemsToSell);
+                        await BackpackHelper.split(itemsToSplit);
                     }
                 }
 
@@ -6073,7 +6175,7 @@ window.setTimeout(function () {
                     if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
                         if (Objects.Room.getMapId() !== 'bingyuegu') {
                             await IceMoonValleyHelper.gotoStartPoint();
-                            await ExecutionManager.wait(2000);
+                            await ExecutionManager.wait(3000);
                         }
 
                         GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
