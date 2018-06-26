@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.68
+// @version      2.1.69
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1296,8 +1296,12 @@ window.setTimeout(function () {
         getAvailableItems (key, defaultItems) {
             let setting = BackpackHelper.getExistingSetting(key, defaultItems);
             let items = setting.split(',');
+            let accurateMatch = items.filter(v => !v.startsWith('~'));
+            let fuzzyMatch = items.filter(v => v.startsWith('~'));
 
-            return Panels.Backpack.getItems('items').filter(v => items.includes(v.getName()));
+            return Panels.Backpack.getItems('items').filter(function (v) {
+                return accurateMatch.includes(v.getName()) || fuzzyMatch.some(t => v.getName().match(t.substr(1)));
+            });
         },
 
         getExistingSetting (key, defaultSetting) {
@@ -4104,6 +4108,7 @@ window.setTimeout(function () {
                 '古墓': 'jh 20;w;w;s;e;#5 s;sw;sw;s;s;e;w;#4 s',
                 '白驼山': 'jh 21;#4 n;#4 s;nw;s;n;w;n;s;w;nw;e;w;nw;nw;n;w;sw;jh 21;nw;w;w;nw;n;e;w;n;n;w;e;n;n;e;e;w;ne;sw;e;se;nw;w;n;s;s;n;w;w;#4 n;#3 s;#4 e;n;n;e;e;w;w;w;e;n;nw;se;ne;e;w;n;jh 21;nw;ne;ne;sw;n;n;ne;w;e;n;n;w;w',
                 '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s',
+                '绝情谷': 'jh 37;n;e;e;nw;nw;w;n;e;n;#3 e;#3 ne;se;n;ne;sw;#3 s;w;w;s',
 
                 '武林广场走一遍': '#9 e'
             },
@@ -4137,6 +4142,7 @@ window.setTimeout(function () {
                     '青城山-小径-游方郎中': 'jh 15;n',
                     '大昭寺-迎梅客栈-店老板': 'jh 26;#6 w;s;e',
                     '青城山-小肉铺-屠夫': 'jh 15;s;s;e',
+                    '青城山-武器店-兵器贩子': 'jh 15;#4 s;w',
 
                     '峨眉山-千佛庵大门-小贩': 'find_family_quest_road;find_clan_quest_road'
                 },
@@ -4595,7 +4601,6 @@ window.setTimeout(function () {
     };
 
     var PuzzleHelper = {
-        _targetNpcNames: ['僧人', '侍女', '隐士', '野兔', '护卫', '尹秋水', '家丁', '护卫总管', '耶律楚哥', '易牙传人', '砍柴人', '独孤雄', '王子轩'],
         _workqueue: [],
 
         reset () {
@@ -4607,16 +4612,14 @@ window.setTimeout(function () {
             PuzzleHelper.reset();
 
             await Navigation.travelsalWithEvent('碧海山庄', breakEvent);
+            await Navigation.travelsalWithEvent('绝情谷', breakEvent);
 
             async function breakEvent () {
                 let npcs = Objects.Room.getAvailableNpcsV2();
-                if (!npcs.length) return false;
-
-                let targets = npcs.filter(v => PuzzleHelper._targetNpcNames.includes(v.getName())).map(v => new Npc(v.getName()));
-                for (let i = 0; i < targets.length; i++) {
-                    await Objects.Npc.action(targets[i], '对话');
+                for (let i = 0; i < npcs.length; i++) {
+                    await Objects.Npc.action(npcs[i], '对话');
                     let lastMessage = Panels.Notices.getLastMessage();
-                    if (isValidTask(lastMessage, targets[i])) PuzzleHelper._workqueue.push(lastMessage);
+                    if (isValidTask(lastMessage, npcs[i])) PuzzleHelper._workqueue.push(lastMessage);
 
                     await ExecutionManager.wait(200);
                     if (!hasQuanlifiedTask(mapName)) {
@@ -4987,33 +4990,6 @@ window.setTimeout(function () {
         subject: '测试中功能',
 
         buttons: [{
-            label: '预设地',
-            title: '可以预设一个常去地点，以后每次点击这个按钮自动到这个地方...',
-            width: '60px',
-            marginRight: '1px',
-
-            eventOnClick () {
-                let path = PathManager.getCustomizedPath();
-                if (!path) {
-                    $('#id-customized-path-setting').click();
-                } else {
-                    Navigation.move(path);
-                }
-            }
-        }, {
-            label: '.',
-            title: '可以预设一个常去地点，以后每次点击这个按钮自动到这个地方',
-            width: '10px',
-            id: 'id-customized-path-setting',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按格式输入对应路径：\n\n例子雪亭城隍庙：jh 1;e;e', PathManager.getCustomizedPath());
-                if (answer) {
-                    PathManager.setCustomizedPath(answer);
-                }
-            }
-        }, {
-        }, {
             label: '飞地图',
             title: '跑地图...',
 
@@ -5204,6 +5180,35 @@ window.setTimeout(function () {
 
                 Navigation.move('home');
             }
+        }, {
+            label: '安全区',
+            title: '可以预设一个常去安全地点，以后每次点击这个按钮自动到这个地方...',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                await EscapeHelper.tryOneoffEscape();
+
+                let path = PathManager.getCustomizedPath();
+                if (!path) {
+                    $('#id-customized-path-setting').click();
+                } else {
+                    Navigation.move(path);
+                }
+            }
+        }, {
+            label: '.',
+            title: '可以预设一个常去地点，以后每次点击这个按钮自动到这个地方',
+            width: '10px',
+            id: 'id-customized-path-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入对应路径：\n\n比如白驼往上一步：jh 21;n', PathManager.getCustomizedPath());
+                if (answer) {
+                    PathManager.setCustomizedPath(answer);
+                }
+            }
+        }, {
         }, {
             label: '一键跨服',
             title: '自动寻路到杜宽处，进入跨服...\n\n注意：进入跨服会自动换成战斗装备。',
@@ -5670,6 +5675,8 @@ window.setTimeout(function () {
                         'wield weapon_moke_dagger10',
                         'wield weapon_moke_dagger11'
                     ].join(';');
+
+                    ButtonManager.resetButtonById('id-equipment-for-study');
                 } else {
                     commands = [
                         'unwield sword of windspring',
@@ -5699,6 +5706,8 @@ window.setTimeout(function () {
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     ButtonManager.click('wield sword of windspring;wear dream hat;wear longyuan banzhi moke');
+
+                    ButtonManager.resetButtonById('id-equipment-for-combat');
                 } else {
                     ButtonManager.click('wield sword of windspring;wear equip_moke_head10;wear equip_moke_finger10');
                 }
@@ -5813,7 +5822,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault));
+                let answer = window.prompt('请按格式输入需要一键卖的物品列表...\n\n注意：\n1. 物品全名，或者以~开头加物品关键字（比如：天寒鞋, 或者 ~天寒）\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SELL, BackpackHelper.itemsToSellByDefault));
                 if (answer) {
                     BackpackHelper.setItemsToSell(answer);
                 }
@@ -5824,7 +5833,7 @@ window.setTimeout(function () {
             width: '38px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault));
+                let answer = window.prompt('请按格式输入需要一键分解的物品列表...\n\n注意：\n1. 物品全名，或者以~开头加物品关键字（比如：残雪鞋, 或者 ~残雪）\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_SPLIT, BackpackHelper.itemsToSplitByDefault));
                 if (answer) {
                     BackpackHelper.setItemsToSplit(answer);
                 }
@@ -5836,7 +5845,7 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault));
+                let answer = window.prompt('请按格式输入需要一键放入仓库的物品列表...\n\n注意：\n1. 物品全名，或者以~开头加物品关键字（比如：碎裂的黄宝石, 或者 ~黄宝石）\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_STORE, BackpackHelper.itemsToStoreByDefault));
                 if (answer) {
                     BackpackHelper.setItemsToStore(answer);
                 }
@@ -5847,7 +5856,7 @@ window.setTimeout(function () {
             width: '38px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入需要一键全部使用的物品列表...\n\n注意：\n1. 需要物品全名\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_USE, BackpackHelper.itemsToUseByDefault));
+                let answer = window.prompt('请按格式输入需要一键全部使用的物品列表...\n\n注意：\n1. 物品全名，或者以~开头加物品关键字（比如：大还丹, 或者 ~还丹）\n2. 物品名字之间以半角逗号隔开', BackpackHelper.getExistingSetting(System.keys.ITEMS_TO_USE, BackpackHelper.itemsToUseByDefault));
                 if (answer) {
                     BackpackHelper.setItemsToUse(answer);
                 }
@@ -6817,7 +6826,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '逃跑叫杀',
-            title: '先逃跑再重新进入叫杀...',
+            title: '叫杀 -> 出招 -> 逃跑 -> 叫杀 -> 如此循环...',
             id: 'id-escape-to-kill',
 
             async eventOnClick () {
