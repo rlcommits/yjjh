@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.73
+// @version      2.1.74
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5967,22 +5967,19 @@ window.setTimeout(function () {
                 await ButtonManager.click('prev');
             }
         }, {
-            label: '设置必刷',
-            title: '设置必刷技能...',
+            label: '取消技能',
+            title: '一键取消所有技能...',
+            id: 'id-cancel-all-skills',
 
             eventOnClick () {
-                let message = ['要选择哪种操作？\n',
-                    '1. 必刷天师灭神剑',
-                    '2. 取消天师灭神剑必刷',
-                    '3. 必刷茅山道术',
-                    '4. 取消茅山道术必刷',
-                    '5. 必刷乾坤大挪移',
-                    '6. 取消乾坤大挪移必刷'
-                ].join('\n');
-
-                let choice = window.prompt(message);
-                if (choice && parseInt(choice)) {
-                    SkillManager.prepareAttackSkills(choice);
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (window.confirm('确定下了所有技能？')) {
+                        ButtonManager.click('enable unmap_all');
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    ButtonManager.click('enable map_all');
                 }
             }
         }]
@@ -7320,4 +7317,4 @@ window.setTimeout(function () {
     log('脚本加载完毕。');
     System.scriptLoaded = true;
     document.title = User.getName();
-}, 1000);
+}, 2000);
