@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.70
+// @version      2.1.71
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -73,10 +73,17 @@ window.setTimeout(function () {
             window.GM_setValue(`${System._uid}.${key}`, value);
         },
 
-        getVariant (key) {
+        getVariant (key, defaultValue) {
             System._initializeUid();
 
-            return window.GM_getValue(`${System._uid}.${key}`);
+            let currentValue = window.GM_getValue(`${System._uid}.${key}`);
+            if (!currentValue && defaultValue) {
+                System.setVariant(key, defaultValue);
+
+                return defaultValue;
+            } else {
+                return currentValue;
+            }
         },
 
         isLocalServer () {
@@ -126,7 +133,8 @@ window.setTimeout(function () {
             MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
             PATH_CUSTOMIZED: 'customizations.user.path',
             EQUIPMENT_COMBAT: 'equipment.combat',
-            EQUIPMENT_STUDY: 'equipment.study'
+            EQUIPMENT_STUDY: 'equipment.study',
+            GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas'
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -1009,11 +1017,7 @@ window.setTimeout(function () {
         },
 
         getDefaultTaskIndexRange () {
-            if (!System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX)) {
-                System.setVariant(System.keys.DAILY_ONEOFF_TASK_INDEX, '1-9');
-            }
-
-            return System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX);
+            return System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX, '1-9');
         },
 
         setDefaultTask (taskIndex) {
@@ -1335,12 +1339,7 @@ window.setTimeout(function () {
         },
 
         getExistingSetting (key, defaultSetting) {
-            let setting = System.getVariant(key);
-            if (!setting) {
-                System.setVariant(key, defaultSetting);
-            }
-
-            return System.getVariant(key);
+            return System.getVariant(key, defaultSetting);
         },
 
         setItemsToSell (itemListString) {
@@ -1361,14 +1360,14 @@ window.setTimeout(function () {
 
         async split (items = []) {
             for (let i = 0; i < items.length; i++) {
-                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 180);
+                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`);
                 log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
             }
         },
 
         async store (items = []) {
             for (let i = 0; i < items.length; i++) {
-                await ButtonManager.click(`items put_store ${items[i].getId()}`, 180);
+                await ButtonManager.click(`items put_store ${items[i].getId()}`);
                 log(`${items[i].getName()} 已放仓库，数量 ${items[i].getQuantity()}`);
             }
         },
@@ -1380,7 +1379,7 @@ window.setTimeout(function () {
                     await ButtonManager.click(`items info ${item.getId()}`);
                     await ButtonManager.click('use_all', 180);
                 } else {
-                    await ButtonManager.click(`#${items[i].getQuantity()} items use ${items[i].getId()}`, 180);
+                    await ButtonManager.click(`#${items[i].getQuantity()} items use ${items[i].getId()}`);
                 }
 
                 log(`${items[i].getName()} 已使用，数量 ${items[i].getQuantity()}`);
@@ -1747,6 +1746,7 @@ window.setTimeout(function () {
             },
 
             retry (message) {
+                log('不在师门，无法睡床。5 分钟后自动重试...');
                 window.setTimeout(MonitorCenter.Sleep.continue, 5 * 60 * 1000);
             }
         },
@@ -2289,11 +2289,7 @@ window.setTimeout(function () {
 
     var ForestHelper = {
         getTraversalPath () {
-            if (!System.getVariant(System.keys.FOREST_TRAVERSAL_PATH)) {
-                System.setVariant(System.keys.FOREST_TRAVERSAL_PATH, ForestHelper.getDefaultTraversalPath());
-            }
-
-            return System.getVariant(System.keys.FOREST_TRAVERSAL_PATH);
+            return System.getVariant(System.keys.FOREST_TRAVERSAL_PATH, ForestHelper.getDefaultTraversalPath());
         },
 
         setTraversalPath (path) {
@@ -2309,16 +2305,7 @@ window.setTimeout(function () {
         },
 
         getStartPointPath () {
-            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH) || isOldPath(System.getVariant(System.keys.FOREST_STARTPOINT_PATH))) {
-                System.setVariant(System.keys.FOREST_STARTPOINT_PATH, ForestHelper.getDefaultStartPointPath());
-            }
-
-            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH);
-
-            function isOldPath (path) {
-                return path === 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353;#4 s;#3 w' ||
-                    path === 'clan;scene;clan fb;clan fb enter shenshousenlin;event_1_40313353';
-            }
+            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH, ForestHelper.getDefaultStartPointPath());
         },
 
         setStartPointPathAlias (alias) {
@@ -2326,11 +2313,7 @@ window.setTimeout(function () {
         },
 
         getStartPointPathAlias () {
-            if (!System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)) {
-                System.setVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS, ForestHelper.getDefaultStartPointPathAlias());
-            }
-
-            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS);
+            return System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS, ForestHelper.getDefaultStartPointPathAlias());
         },
 
         getStartPointPathAliasAbbr () {
@@ -2499,19 +2482,11 @@ window.setTimeout(function () {
         },
 
         getSkill () {
-            if (!System.getVariant(System.keys.RECOVERY_SKILL)) {
-                System.setVariant(System.keys.RECOVERY_SKILL, '道种心魔经');
-            }
-
-            return System.getVariant(System.keys.RECOVERY_SKILL);
+            return System.getVariant(System.keys.RECOVERY_SKILL, '道种心魔经');
         },
 
         getThreshold () {
-            if (!System.getVariant(System.keys.RECOVERY_THRESHOLD)) {
-                System.setVariant(System.keys.RECOVERY_THRESHOLD, 0.7);
-            }
-
-            return System.getVariant(System.keys.RECOVERY_THRESHOLD);
+            return System.getVariant(System.keys.RECOVERY_THRESHOLD, 0.7);
         },
 
         setThreshold (threshold) {
@@ -2635,11 +2610,7 @@ window.setTimeout(function () {
     var PerformHelper = {
         Skillset: {
             getSkills () {
-                if (!System.getVariant(System.keys.ATTACK_SKILLS)) {
-                    System.setVariant(System.keys.ATTACK_SKILLS, ['如来神掌', '覆雨剑法']);
-                }
-
-                return System.getVariant(System.keys.ATTACK_SKILLS);
+                return System.getVariant(System.keys.ATTACK_SKILLS, ['如来神掌', '覆雨剑法']);
             },
 
             setSkills (skills = []) {
@@ -2652,11 +2623,7 @@ window.setTimeout(function () {
         },
 
         getBufferReserved () {
-            if (!System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)) {
-                System.setVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED, 0);
-            }
-
-            return parseInt(System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED));
+            return parseInt(System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED, 0));
         },
 
         setBufferReserved (bufferReserved) {
@@ -2698,6 +2665,30 @@ window.setTimeout(function () {
 
         inProgress () {
             return $('#combat_auto_fight').html();
+        }
+    };
+
+    var GanodermasPurchaseHelper = {
+        _cancelled: false,
+
+        reset () {
+            GanodermasPurchaseHelper._cancelled = false;
+        },
+
+        stop () {
+            GanodermasPurchaseHelper._cancelled = true;
+        },
+
+        isCancelled () {
+            return GanodermasPurchaseHelper._cancelled;
+        },
+
+        getThreshold () {
+            return System.getVariant(System.keys.GANODERMAS_PURCHASE, 500);
+        },
+
+        setThreshold (threshold) {
+            System.setVariant(System.keys.GANODERMAS_PURCHASE, threshold);
         }
     };
 
@@ -3009,7 +3000,10 @@ window.setTimeout(function () {
             },
 
             getItemQuantityByName (name = '') {
-                return System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(`,${name},`)).length;
+                let records = System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(`,${name},`));
+                if (records.length === 0) return 0;
+
+                return parseInt(records[0]['value'].split(',')[2]);
             }
         }
     };
@@ -3299,9 +3293,12 @@ window.setTimeout(function () {
         },
 
         async _killAndMove () {
-            debugging('开始地图清理...');
+            debugging('开始房间清理...');
 
+            await Objects.Room.refresh();
             let npcs = GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter);
+            debugging('当前房间 npcs：', npcs);
+
             if (npcs.length) {
                 let combat = new Combat(200, false, !GenericMapCleaner._maxEnforce);
                 combat.initialize(npcs[0], '杀死');
@@ -3321,6 +3318,7 @@ window.setTimeout(function () {
 
             if (!GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter).length) {
                 if (GenericMapCleaner._travelsalByGivenPath) {
+                    debugging('path', GenericMapCleaner._path);
                     if (GenericMapCleaner._path.length === 0) {
                         GenericMapCleaner._stop = true;
                     } else {
@@ -3337,19 +3335,18 @@ window.setTimeout(function () {
                 if (v.getId().includes('hero')) return false;
 
                 let regExcluded = regexExpressionFilter.getRegexExpression4Exclusion();
+                debugging('filter:', regexExpressionFilter);
                 if (regExcluded && v.getName().match(regExcluded)) return false;
 
                 let regMatch = regexExpressionFilter.getRegexExpression4Match();
-                if (regMatch) {
-                    return v.getName().match(regMatch);
-                } else {
-                    return true;
-                }
+                return !regMatch || v.getName().match(regMatch);
             });
         },
 
         async gotoStartPoint (startPath) {
             await Navigation.move(startPath);
+
+            debugging('到达目的地。');
         },
 
         async start () {
@@ -3361,7 +3358,7 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH);
+            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH, '');
         },
 
         setRegKeywords (regKeywords) {
@@ -3369,7 +3366,7 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED);
+            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED, '');
         },
 
         setRegKeywords4ExcludedTargets (regKeywords) {
@@ -3387,12 +3384,7 @@ window.setTimeout(function () {
         _retry: new Retry(60 * 1000),
 
         getThreshold () {
-            let threshold = System.getVariant(System.keys.MAP_FRAGMENT_THRESHOLD);
-            if (!threshold) {
-                System.setVariant(System.keys.MAP_FRAGMENT_THRESHOLD, 30000000);
-            }
-
-            return System.getVariant(System.keys.MAP_FRAGMENT_THRESHOLD);
+            return System.getVariant(System.keys.MAP_FRAGMENT_THRESHOLD, 30000000);
         },
 
         setThreshold (threshold) {
@@ -3402,11 +3394,7 @@ window.setTimeout(function () {
 
     var TianjianValleyHelper = {
         getRegexExpression4Match () {
-            if (!System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN)) {
-                System.setVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN, '');
-            }
-
-            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN);
+            return System.getVariant(System.keys.MAP_CLEANER_REG_MATCH_TIANJIAN, '');
         },
 
         setRegexExpression4Match (regKeywords) {
@@ -3414,11 +3402,7 @@ window.setTimeout(function () {
         },
 
         getRegexExpression4Exclusion () {
-            if (!System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN)) {
-                System.setVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN, '');
-            }
-
-            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN);
+            return System.getVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN, '');
         },
 
         setRegexExpression4Exclusion (regKeywords) {
@@ -4615,7 +4599,7 @@ window.setTimeout(function () {
                 '洛阳凌中天': 'jh 2;#5 n;e;e;#4 n;e',
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
 
-                '冰月谷': 'jh 14;w;#4 n;event_1_32682066',
+                '冰月谷': 'jh 14;w;#4 n;event_1_32682066;~寒冰之湖',
 
                 '冰湖': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;e',
                 '扬州出发钓鱼加玄铁': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
@@ -5021,6 +5005,18 @@ window.setTimeout(function () {
                 }
             }
         }, {
+            label: '自动睡床',
+            title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：\n1. 睡床结束时角色在师门的话会自动触发继续睡床。\n2. 如果因为不在师门触发不了睡床，脚本会每隔 5 分钟重试一次直到成功。\n3. 暂不支持自动飞回师门睡床，避免一些诸如森林中自动飞出的尴尬。',
+            id: 'id-continue-sleep',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Sleep.turnOn();
+                } else {
+                    MonitorCenter.Sleep.turnOff();
+                }
+            }
+        }, {
             label: '自动跟招',
             title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
             id: 'id-auto-follower-best-skill',
@@ -5179,19 +5175,6 @@ window.setTimeout(function () {
                     }
                 } else {
                     JobManager.getJob(this.id).stop();
-                }
-            }
-        }, {
-        }, {
-            label: '自动睡床',
-            title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：在师门才可生效。',
-            id: 'id-continue-sleep',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    MonitorCenter.Sleep.turnOn();
-                } else {
-                    MonitorCenter.Sleep.turnOff();
                 }
             }
         }, {
@@ -5365,19 +5348,6 @@ window.setTimeout(function () {
                 } else {
                     await Navigation.move('e;s;se;sw;s;sw;e;e;sw;se;sw;se;event_1_8004914');
                 }
-            }
-        }, {
-            label: '回城买药',
-            title: '点击一次买 50 棵千年灵芝...\n\n注意：不能现场购买，只能回到雪亭镇药铺买，且购买结束无法自动返回当前所在地',
-
-            async eventOnClick () {
-                if (Objects.Room.getName() !== '桑邻药铺') {
-                    if (window.confirm('确定回雪亭镇买五十棵千年灵芝？')) {
-                        await ButtonManager.click('jh 1;e;#3 n;w');
-                    }
-                }
-
-                await ButtonManager.click('#5 buy /map/snow/obj/qiannianlingzhi_N_10 from snow_herbalist');
             }
         }, {
             label: '山坳年兽',
@@ -6172,15 +6142,20 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
-                        if (Objects.Room.getMapId() !== 'bingyuegu') {
-                            await IceMoonValleyHelper.gotoStartPoint();
-                            await ExecutionManager.wait(3000);
+                    if (Objects.Room.getMapId() !== 'bingyuegu') {
+                        if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
+                            if (Objects.Room.getMapId() !== 'bingyuegu') {
+                                await IceMoonValleyHelper.gotoStartPoint();
+                                await ExecutionManager.wait(3000);
+                            } else {
+                                ButtonManager.resetButtonById(this.id);
+                                return;
+                            }
                         }
-
-                        GenericMapCleaner.initialize(true, '~寒冰之湖;~冰月湖心'.split(';'), 3000);
-                        await GenericMapCleaner.start();
                     }
+
+                    GenericMapCleaner.initialize(true, ['~冰月湖心'], 3000);
+                    await GenericMapCleaner.start();
 
                     ButtonManager.resetButtonById(this.id);
                 } else {
@@ -6649,6 +6624,52 @@ window.setTimeout(function () {
                 }
             }
         }, {
+        }, {
+            label: '买药',
+            title: '点击一次则自动买到足够数目（可设定）...\n\n注意：\n1. 不能现场购买，只能回到雪亭镇药铺买，且购买结束无法自动返回当前所在地\n2. 中途可手工停止\n3. 为简化逻辑，只整十购买。',
+            id: 'id-buy-ganodermas',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    let currentQuantity = Panels.Backpack.getItemQuantityByName('千年灵芝');
+                    let quantityToBuy = GanodermasPurchaseHelper.getThreshold() - currentQuantity;
+                    if (quantityToBuy <= 0) {
+                        window.alert(`现在背包里已经有 ${currentQuantity} 棵千年灵芝，不需要再购买。`);
+                    } else {
+                        if (window.confirm(`本次需要购买 ${quantityToBuy} 棵千年灵芝，耗费银两 ${quantityToBuy} 万，确定继续？`)) {
+                            if (Objects.Room.getName() !== '桑邻药铺') {
+                                await ButtonManager.click('jh 1;e;#3 n;w');
+                            }  
+
+                            GanodermasPurchaseHelper.reset();
+                            let buyTimes = quantityToBuy / 10;
+                            for (let i = 0; i < buyTimes; i++) {
+                                if (GanodermasPurchaseHelper.isCancelled()) break;
+
+                                await ButtonManager.click(`buy /map/snow/obj/qiannianlingzhi_N_10 from snow_herbalist`);
+                            }
+                        }
+                    }
+
+                    ButtonManager.resetButtonById(this.id);
+                } else {
+                    GanodermasPurchaseHelper.stop();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置购买千年灵芝到多少棵为止...',
+            id: 'id-buy-ganodermas-setting',
+            width: '10px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入购买千年灵芝的上限数值。', GanodermasPurchaseHelper.getThreshold());
+                if (answer) {
+                    GanodermasPurchaseHelper.setThreshold(parseInt(answer));
+                }
+            }
         }, {
             label: '切磋回内',
             title: '点开任意 npc 到有比试选项的界面，即可自动持续切磋至内力补满 90%。\n\n注意：\n1. 必刷道心（需链接不动）\n2. 为避免 npc 血太少无法持续切磋，脚本会持续自动逃跑再进入战斗放道心\n3. 中途可手工停止',
