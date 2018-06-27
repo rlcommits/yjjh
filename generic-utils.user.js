@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.71
+// @version      2.1.72
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5487,11 +5487,11 @@ window.setTimeout(function () {
                 }
 
                 if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
+                    await Navigation.move(ForestHelper.getStartPointPath());
+                    
                     if (notifyTeamRequired) {
                         TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
                     }
-
-                    Navigation.move(ForestHelper.getStartPointPath());
                 }
             }
         }, {
@@ -6636,7 +6636,7 @@ window.setTimeout(function () {
                     let currentQuantity = Panels.Backpack.getItemQuantityByName('千年灵芝');
                     let quantityToBuy = GanodermasPurchaseHelper.getThreshold() - currentQuantity;
                     if (quantityToBuy <= 0) {
-                        window.alert(`现在背包里已经有 ${currentQuantity} 棵千年灵芝，不需要再购买。`);
+                        window.alert(`现在背包里已经有 ${currentQuantity} 棵千年灵芝，大于你设定的阈值 ${GanodermasPurchaseHelper.getThreshold()}, 所以不需要再购买。`);
                     } else {
                         if (window.confirm(`本次需要购买 ${quantityToBuy} 棵千年灵芝，耗费银两 ${quantityToBuy} 万，确定继续？`)) {
                             if (Objects.Room.getName() !== '桑邻药铺') {
