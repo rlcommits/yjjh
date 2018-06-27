@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.72
+// @version      2.1.73
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2392,34 +2392,37 @@ window.setTimeout(function () {
                     await Objects.Npc.action(this._npc, this._action);
                 }
 
-                await this.perform(this._skills, this._bufferReserved);
+                await this.performSkills(this._skills, this._bufferReserved);
                 if (this._zeroEnforce) EnforceHelper.recoverEnforce();
             }
         }
 
-        async perform (skills, bufferReserved = 0) {
+        async performSkills (skills = [], bufferReserved = 0) {
             if (this._printCombatInfo) debugging('战场信息：', null, Panels.Combat.getCombatInfo);
 
-            if (!CombatStatus.inProgress()) return false;
-            if (this.readyToStop()) return true;
+            if (!CombatStatus.inProgress() || this.readyToStop()) return;
 
             if (this._additionalStopEvent && this._additionalStopEvent.getCriterial()()) {
                 this._additionalStopEvent.getAction()();
-            } else if (!CombatHelper.isAutoPerformingEnabled()) {
-                if (!skills || skills.length === 0) {
+            } else {
+                if (skills && skills.length > 0) {
+                    fire(skills, bufferReserved);
+                } else if (!CombatHelper.isAutoPerformingEnabled() && !skills.length) {
                     skills = Panels.Combat.getAvailableAttackSkills()[0];
-                    debugging(`战斗发起时未指定技能，脚本自动选取一个可用的攻击技能 ${skills}。`);
+                    debugging(`无指定技能，脚本自动选取一个可用的攻击技能 ${skills}。`);
+                    fire(skills, bufferReserved);
                 }
 
+                await ExecutionManager.wait(this._checkInterval);
+                await this.performSkills(skills, bufferReserved);
+            }
+
+            function fire (skills, bufferReserved) {
                 if (PerformHelper.readyToPerform(new BufferCalculator(skills).getBufferRequired() + bufferReserved)) {
                     debugging(`技能 ${skills} 准备就绪。`);
                     PerformHelper.perform(skills);
                 }
             }
-
-            await ExecutionManager.wait(this._checkInterval);
-
-            return this.perform(skills, bufferReserved);
         }
 
         stopManually () {
@@ -5488,7 +5491,7 @@ window.setTimeout(function () {
 
                 if (window.confirm(`本操作会进入到设定好的森林入口"${ForestHelper.getStartPointPathAlias()}"，确定继续？\n\n注意：\n${warning}`)) {
                     await Navigation.move(ForestHelper.getStartPointPath());
-                    
+
                     if (notifyTeamRequired) {
                         TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
                     }
@@ -6641,7 +6644,7 @@ window.setTimeout(function () {
                         if (window.confirm(`本次需要购买 ${quantityToBuy} 棵千年灵芝，耗费银两 ${quantityToBuy} 万，确定继续？`)) {
                             if (Objects.Room.getName() !== '桑邻药铺') {
                                 await ButtonManager.click('jh 1;e;#3 n;w');
-                            }  
+                            }
 
                             GanodermasPurchaseHelper.reset();
                             let buyTimes = quantityToBuy / 10;
