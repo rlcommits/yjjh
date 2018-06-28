@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.74
+// @version      2.1.75
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -980,10 +980,10 @@ window.setTimeout(function () {
             todo: true
         }, {
             index: 9,
-            item: 'vip 暴击谜题 + 副本扫荡一到四',
+            item: 'vip 暴击谜题 + 副本扫荡一到五',
             action: async function () {
                 await ButtonManager.click('vip drops;#10 vip finish_big_task;#10 vip finish_dig');
-                await ButtonManager.click('#2 vip finish_fb dulongzhai;#2 vip finish_fb junying;#2 vip finish_fb beidou;#2 vip finish_fb youling');
+                await ButtonManager.click('#2 vip finish_fb dulongzhai;#2 vip finish_fb junying;#2 vip finish_fb beidou;#2 vip finish_fb youling;#2 vip finish_fb siyu');
             },
             todo: true
         }],
