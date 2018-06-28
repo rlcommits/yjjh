@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.76
+// @version      2.1.77
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -728,25 +728,41 @@ window.setTimeout(function () {
     };
 
     var EquipmentHelper = {
-        combatItemsByDefault: '',
-        studyItemsByDefault: '',
+        combatItemsByDefault: [],
+        studyItemsByDefault: [],
 
         combat: ['九天龙吟剑', '天罡拳套'].join(','),
         study: ['迷幻经纶'].join(','),
 
-        switch2CombatMode () {
+        async switch2CombatMode () {
             window.alert('本功能尚未完成');
         },
 
-        quitCombatMode () {
+        async quitCombatMode () {
 
         },
 
-        switch2StudyMode () {
-            window.alert('本功能尚未完成');
+        async switch2StudyMode () {
+            await EquipmentHelper._wear(EquipmentHelper.getDresses(System.keys.EQUIPMENTS_FOR_STUDY, EquipmentHelper.studyItemsByDefault));
         },
 
-        quitStudyMode () {
+        async quitStudyMode () {
+
+        },
+
+        getDresses (key) {
+            return System.getVariant(key);
+        },
+
+        getWeapons () {
+
+        },
+
+        async _wear (dresses = []) {
+
+        },
+
+        async _wield (weapons = []) {
 
         },
 
@@ -2474,6 +2490,37 @@ window.setTimeout(function () {
         }
     };
 
+    var FugitiveManager = {
+        turnOn () {
+            InterceptorRegistry.register(new Interceptor('跨服逃犯监听', FugitiveManager.newEvents, FugitiveManager.fire, 'channel', 'sys'));
+        },
+
+        turnOff () {
+            InterceptorRegistry.unregister('跨服逃犯监听');
+        },
+
+        newEvents (message) {
+            let text = message.get('msg');
+            if (!text) return false;
+
+            debugging('判定是否本服逃犯...');
+            if (System.isLocalServer() && !text.startsWith('[1;31m【系统】')) return false;
+            debugging('判定是否跨服本区逃犯...');
+            if (!text.startsWith(`[1;31m【系统】[${User.getAreaRange()}区]`)) return false;
+
+            debugging('判定是否包含其他关键字...');
+            return text.includes('慌不择路，逃往了');
+        },
+
+        fire (message) {
+            let matches = System.replaceControlCharBlank(message.get('msg')).match('【系统】(.*?)慌不择路，逃往了(.*?)-href;0;(.*?).*?0');
+            if (matches) {
+                debugging(`发现逃犯 ${matches[1]}, 位置 ${matches[2]}`);
+                ExecutionManager.execute(`clickButton('${matches[3]}', 0) `);
+            }
+        }
+    };
+
     var RecoveryHelper = {
         _retry: new Retry(500),
         _stopContinualRecovery: false,
@@ -3321,10 +3368,12 @@ window.setTimeout(function () {
 
             if (!GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter).length) {
                 if (GenericMapCleaner._travelsalByGivenPath) {
-                    debugging('path', GenericMapCleaner._path);
+                    debugging('遍历路径', GenericMapCleaner._path);
                     if (GenericMapCleaner._path.length === 0) {
+                        debugging('已经走完所有路径。');
                         GenericMapCleaner._stop = true;
                     } else {
+                        debugging('移动到下一个房间...');
                         await Navigation.move(GenericMapCleaner._path.shift());
                     }
                 } else {
@@ -3338,9 +3387,11 @@ window.setTimeout(function () {
                 if (v.getId().includes('hero')) return false;
 
                 let regExcluded = regexExpressionFilter.getRegexExpression4Exclusion();
-                debugging('filter:', regexExpressionFilter);
+                debugging(`检查当前 npc：${v.toString()}`);
+                debugging('检查过滤不打的名单：', regexExpressionFilter);
                 if (regExcluded && v.getName().match(regExcluded)) return false;
 
+                debugging('检查目标名单：', regexExpressionFilter);
                 let regMatch = regexExpressionFilter.getRegexExpression4Match();
                 return !regMatch || v.getName().match(regMatch);
             });
@@ -3353,7 +3404,7 @@ window.setTimeout(function () {
         },
 
         async start () {
-            GenericMapCleaner._retry.fire();
+            await GenericMapCleaner._retry.fire();
         },
 
         stop () {
@@ -3996,7 +4047,7 @@ window.setTimeout(function () {
         async resolveDeathBookIfAny () {
             let bookQuantity = Panels.Backpack.getItemQuantityByName('生死簿');
             if (bookQuantity) {
-                await ButtonManager.click(`#${bookQuantity} event_1_64058963 go`);
+                await Objects.Npc.action(new Npc('杜宽'), '销毁生死簿（银两）', bookQuantity);
                 log(`销毁生死簿：${bookQuantity} 本`);
             }
         }
@@ -4444,7 +4495,6 @@ window.setTimeout(function () {
                     '白驮山-大门': 'jh 21;nw;w;w;nw;n;n',
                     '白驮山-广场': 'jh 21;nw;w;w;nw',
                     '白驮山-花园': 'jh 21;nw;w;w;nw;#7 n',
-                    '白驮山-草丛': 'jh 21;nw;w;w;nw;#5 n;#4 w',
                     '白驮山-厨房': 'jh 21;nw;w;w;nw;#7 n;e',
                     '白驮山-柴房': 'jh 21;nw;w;w;nw;#7 n;e;e',
                     '白驮山-练功室': 'jh 21;nw;w;w;nw;#5 n;e;ne',
@@ -4602,7 +4652,7 @@ window.setTimeout(function () {
                 '洛阳凌中天': 'jh 2;#5 n;e;e;#4 n;e',
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
 
-                '冰月谷': 'jh 14;w;#4 n;event_1_32682066;~寒冰之湖',
+                '冰月谷': 'jh 14;w;#4 n;event_1_32682066;#wait 1500;~寒冰之湖;#wait 1000',
 
                 '冰湖': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;e',
                 '扬州出发钓鱼加玄铁': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
@@ -5107,6 +5157,18 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按顺序输入学习模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_STUDY, EquipmentHelper.studyItemsByDefault));
                 if (answer) {
                     EquipmentHelper.setItemsForCombat(answer);
+                }
+            }
+        }, {
+            label: '逃犯',
+            title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 只抓取段老大和二娘的信息',
+            id: 'id-fugitive-monitor',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    FugitiveManager.turnOn();
+                } else {
+                    FugitiveManager.turnOff();
                 }
             }
         }, {
@@ -5992,7 +6054,7 @@ window.setTimeout(function () {
             title: '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true),
             width: '60px',
             marginRight: '1px',
-            id: 'id-oneoff-tasks',
+            id: 'id-oneoff-tasks-stateless',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -6002,7 +6064,7 @@ window.setTimeout(function () {
                 }
 
                 DailyOneOffTaskHelper.stop();
-                ButtonManager.resetButtonById('id-oneoff-tasks');
+                ButtonManager.resetButtonById(this.id);
             }
         }, {
             label: '.',
@@ -6018,7 +6080,7 @@ window.setTimeout(function () {
                     window.alert('请按格式输入任务序号或序号范围。');
                 } else {
                     DailyOneOffTaskHelper.setDefaultTask(choice);
-                    $('#id-oneoff-tasks').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true));
+                    $('#id-oneoff-tasks-stateless').attr('title', '当前设定为：\n\n' + DailyOneOffTaskHelper.getTaskListString(true));
                 }
             }
         }, {
@@ -6146,17 +6208,21 @@ window.setTimeout(function () {
                         if (window.confirm('一天只有一次机会，确定进入冰月谷自动开杀？')) {
                             if (Objects.Room.getMapId() !== 'bingyuegu') {
                                 await IceMoonValleyHelper.gotoStartPoint();
-                                await ExecutionManager.wait(3000);
                             } else {
                                 ButtonManager.resetButtonById(this.id);
                                 return;
                             }
+                        } else {
+                            ButtonManager.resetButtonById(this.id);
+                            return;
                         }
                     }
 
-                    GenericMapCleaner.initialize(true, ['~冰月湖心'], 3000);
-                    await GenericMapCleaner.start();
-
+                    if (!Panels.Notices.containsMessage('今天进入冰月谷的次数已达到上限。')) {
+                        GenericMapCleaner.initialize(true, ['~冰月湖心'], 1000);
+                        await GenericMapCleaner.start();
+                    }
+                    
                     ButtonManager.resetButtonById(this.id);
                 } else {
                     GenericMapCleaner.stop();
@@ -6633,6 +6699,7 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    await ButtonManager.click('items');
                     let currentQuantity = Panels.Backpack.getItemQuantityByName('千年灵芝');
                     let quantityToBuy = GanodermasPurchaseHelper.getThreshold() - currentQuantity;
                     if (quantityToBuy <= 0) {
