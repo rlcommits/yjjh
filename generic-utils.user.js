@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.75
+// @version      2.1.76
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -975,7 +975,7 @@ window.setTimeout(function () {
             item: '帮派烧香 + 闯楼奖励',
             action: async function () {
                 await ButtonManager.click('#20 clan incense yx');
-                await ButtonManager.click('cangjian get_all;xueyin_shenbinggu unarmed get_all;xueyin_shenbinggu blade get_all;xueyin_shenbinggu throwing get_all');
+                await ButtonManager.click('cangjian get_all;xueyin_shenbinggu unarmed get_all;xueyin_shenbinggu blade get_all;xueyin_shenbinggu throwing get_all;xueyin_shenbinggu spear;xueyin_shenbinggu hammer;xueyin_shenbinggu axe;xueyin_shenbinggu whip;xueyin_shenbinggu stick;xueyin_shenbinggu staff');
             },
             todo: true
         }, {
