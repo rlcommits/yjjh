@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.81
+// @version      2.1.82
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1986,13 +1986,25 @@ window.setTimeout(function () {
                         break;
                     }
 
+                    if (candidates[i].isFavorabilityMax()) {
+                        await getFruitsDirectly(candidates[i]);
+                        candidates[i].setTalked(true);
+                        debugging('直接拿到果子。');
+                        continue;
+                    }
+
                     await KnightManager.capture(candidates[i].getName());
 
                     let talked = await startTalks(new Npc(candidates[i].getName()));
-                    debugging('talked=' + talked);
+                    debugging('完成对话：' + talked);
                     candidates[i].setTalked(talked);
 
                     if (!talked && i < 4) KnightManager._stopAskingForFruits = true;
+                }
+
+                async function getFruitsDirectly (knight) {
+                    await ExecutionManager.asyncExecute("clickButton('open jhqx', 0)", 800);
+                    await ExecutionManager.asyncExecute(Panels.Knights.getFruitLink(knight.getName()), 500);
                 }
 
                 async function startTalks (knight) {
@@ -3035,8 +3047,12 @@ window.setTimeout(function () {
         },
 
         Knights: {
-            findKnightLink (knight) {
-                return $('a').filter(function () { return $(this).text() === knight; }).attr('href');
+            findKnightLink (knightName) {
+                return $('a').filter(function () { return $(this).text() === knightName; }).attr('href');
+            },
+
+            getFruitLink (knightName) {
+                return $('a').filter(function () { return $(this).text() === knightName; }).next().attr('href');
             }
         },
 
