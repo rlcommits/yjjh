@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.79
+// @version      2.1.80
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1839,6 +1839,8 @@ window.setTimeout(function () {
 
             await fight(name, '比试', KnightManager._puppetSkills, new CustomizedEvent(this.puppetExists, this.escape));
 
+            Objects.Room.refresh();
+            await ExecutionManager.wait(500);
             let puppetName = Objects.Room.hasNpc('金甲符兵') ? '金甲符兵' : '玄阴符兵';
             await fight(puppetName, '比试');
 
@@ -2399,8 +2401,6 @@ window.setTimeout(function () {
                 if (this._zeroEnforce) EnforceHelper.suppressEnforce();
 
                 await Objects.Npc.action(this._npc, this._action);
-                log('双方对战人员：', null, Panels.Combat.getCombatInfo);
-
                 await ExecutionManager.wait(1000);
 
                 if (!CombatStatus.inProgress()) {
@@ -2408,17 +2408,19 @@ window.setTimeout(function () {
                     await Objects.Npc.action(this._npc, this._action);
                 }
 
-                await this.performSkills(this._skills, this._bufferReserved);
+                await this.fighting(this._skills, this._bufferReserved);
+
                 if (this._zeroEnforce) EnforceHelper.recoverEnforce();
             }
         }
 
-        async performSkills (skills = [], bufferReserved = 0) {
+        async fighting (skills = [], bufferReserved = 0) {
             if (this._printCombatInfo) debugging('战场信息：', null, Panels.Combat.getCombatInfo);
 
             if (!CombatStatus.inProgress() || this.readyToStop()) return;
 
             if (this._additionalStopEvent && this._additionalStopEvent.getCriterial()()) {
+                debugging('预设停止条件达成，触发对应行为...');
                 this._additionalStopEvent.getAction()();
             } else {
                 if (skills && skills.length > 0) {
@@ -2428,10 +2430,10 @@ window.setTimeout(function () {
                     debugging(`无指定技能，脚本自动选取一个可用的攻击技能 ${skills}。`);
                     fire(skills, bufferReserved);
                 }
-
-                await ExecutionManager.wait(this._checkInterval);
-                await this.performSkills(skills, bufferReserved);
             }
+
+            await ExecutionManager.wait(this._checkInterval);
+            await this.fighting(skills, bufferReserved);
 
             function fire (skills, bufferReserved) {
                 if (PerformHelper.readyToPerform(new BufferCalculator(skills).getBufferRequired() + bufferReserved)) {
@@ -6437,7 +6439,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (window.confirm('确定开始随机走图且叫杀所有 npc?')) {
-                        GenericMapCleaner.initialize(false, [], 1500, new RegexExpressionFilter(), true, false);
+                        GenericMapCleaner.initialize(false, [], 2000, new RegexExpressionFilter(), true, false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
