@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.80
+// @version      2.1.81
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1074,6 +1074,14 @@ window.setTimeout(function () {
             return this._name;
         }
 
+        isFavorabilityMax () {
+            return this._favorabilityMax;
+        }
+
+        setFavorabilityMax (favorabilityMax) {
+            this._favorabilityMax = favorabilityMax;
+        }
+
         getProgress () {
             return this._progress;
         }
@@ -1885,18 +1893,21 @@ window.setTimeout(function () {
             return sort(knights);
 
             function sort (knights) {
-                let over25000 = knights.filter((v) => v.getProgress() >= 25000);
+                let maxFavorabilities = knights.filter(v => v.isFavorabilityMax());
+
+                let over25000 = knights.filter(v => v.getProgress() >= 25000 && !v.isFavorabilityMax());
                 over25000.sort((a, b) => a.getProgress() - b.getProgress());
 
-                let lessThan25000 = knights.filter((v) => v.getProgress() < 25000);
+                let lessThan25000 = knights.filter(v => v.getProgress() < 25000);
                 lessThan25000.sort((a, b) => b.getProgress() - a.getProgress());
 
-                return over25000.concat(lessThan25000);
+                return over25000.concat(lessThan25000).concat(maxFavorabilities);
             }
 
             function parseKnightInfo (info) {
                 let nameWithProgress = info.shift();
                 let matches = nameWithProgress.match('(.*?)\\(([0-9]{0,5})\\)') || nameWithProgress.match('(.*)');
+                let favorabilityMax = nameWithProgress.includes('朱果');
                 let name = matches[1];
                 let knight = new Knight(name); info.shift();
                 let status = info.shift();
@@ -1904,7 +1915,9 @@ window.setTimeout(function () {
                 knight.setAvailability(status !== '师门' && status !== '隐居修炼'); info.shift();
                 knight.setProgress(matches.length > 2 ? parseInt(matches[2]) : 0);
                 knight.setTalked(false);
+                knight.setFavorabilityMax(favorabilityMax);
 
+                debugging('奇侠信息解析完毕', knight);
                 return knight;
             }
         },
@@ -2047,10 +2060,13 @@ window.setTimeout(function () {
             function buildPromptMessage (question, candidates) {
                 let message = question;
                 for (let i = 0; i < candidates.length; i++) {
-                    if (i !== 0) message = message + '\n';
+                    if (i !== 0) message += ' => ';
+                    if (i !== 0 && i % 3 === 0) message += '\n';
 
-                    message = message + candidates[i].getName() + ' (' + candidates[i].getProgress() + ')';
-                    if (!candidates[i].getAvailability()) message = message + ' - 未出师无法对话';
+                    message += candidates[i].getName() + ' (' + candidates[i].getProgress();
+                    if (!candidates[i].getAvailability()) message += ' - 未出师';
+
+                    message += ')';
                 }
 
                 return message;
@@ -6477,7 +6493,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '一键果子',
-            title: '自动按最优策略依次对话奇侠拿果子\n\n注意：\n1. 每天20次的撩奇侠请自行先解决，否则相当于浪费20次机会。\n2. 本版本针对未出师的奇侠会跳出提示跳过或取消当前轮。\n3. 当前策略：先筛选好感度达到 25000 的游侠，按好感度从低到高对话，剩余奇侠按好感度从高到低依次对话。',
+            title: '自动按最优策略依次对话奇侠拿果子\n\n注意：\n1. 每天20次的撩奇侠请自行先解决，否则相当于浪费20次机会。\n2. 本版本针对未出师的奇侠会跳出提示跳过或取消当前轮。\n3. 当前策略：先筛选好感度达到 25000 但还不能直接拿果子的游侠，按好感度从低到高对话 -> 剩余好感度不足 25000 的奇侠按好感度从高到低依次对话 -> 最后好感度足以直接拿果子的垫底。',
             id: 'id-fruits-stateless',
 
             async eventOnClick () {
