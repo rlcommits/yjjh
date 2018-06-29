@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.77
+// @version      2.1.78
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -991,7 +991,7 @@ window.setTimeout(function () {
             item: '帮派烧香 + 闯楼奖励',
             action: async function () {
                 await ButtonManager.click('#20 clan incense yx');
-                await ButtonManager.click('cangjian get_all;xueyin_shenbinggu unarmed get_all;xueyin_shenbinggu blade get_all;xueyin_shenbinggu throwing get_all;xueyin_shenbinggu spear;xueyin_shenbinggu hammer;xueyin_shenbinggu axe;xueyin_shenbinggu whip;xueyin_shenbinggu stick;xueyin_shenbinggu staff');
+                await ButtonManager.click('cangjian get_all;xueyin_shenbinggu unarmed get_all;xueyin_shenbinggu blade get_all;xueyin_shenbinggu throwing get_all;xueyin_shenbinggu spear get_all;xueyin_shenbinggu hammer get_all;xueyin_shenbinggu axe get_all;xueyin_shenbinggu whip get_all;xueyin_shenbinggu stick get_all;xueyin_shenbinggu staff get_all');
             },
             todo: true
         }, {
@@ -5642,7 +5642,7 @@ window.setTimeout(function () {
 
                     if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
                         let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
-                        GenericMapCleaner.initialize(false, [], 2000, filter, false);
+                        GenericMapCleaner.initialize(false, [], 2000, filter, true);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -6222,7 +6222,7 @@ window.setTimeout(function () {
                         GenericMapCleaner.initialize(true, ['~冰月湖心'], 1000);
                         await GenericMapCleaner.start();
                     }
-                    
+
                     ButtonManager.resetButtonById(this.id);
                 } else {
                     GenericMapCleaner.stop();
