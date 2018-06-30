@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.84
+// @version      2.1.85
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -4641,7 +4641,6 @@ window.setTimeout(function () {
                 '千尺幢': 'jh 4;#4 n',
                 '玉女峰': 'jh 4;#8 n;w',
                 '山坳': 'jh 1;e;#5 n',
-                '九老洞': 'jh 8;w;nw;n;#4n;e;e;n;n;e',
                 '猢狲愁': 'jh 4;#6 n;e;n;n',
                 '长空栈道': 'jh 4;#9 n;e',
                 '临渊石台': 'jh 4;#9 n;e;n',
@@ -4964,7 +4963,7 @@ window.setTimeout(function () {
                 } else {
                     switch (steps[i][0]) {
                         case '~':
-                            await ExecutionManager.asyncExecute("clickButton('" + steps[i] + "')");
+                            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[i].substr(1)));
                             break;
                         case '@':
                             await eval(steps[i].substr(1));
