@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.82
+// @version      2.1.83
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2290,6 +2290,22 @@ window.setTimeout(function () {
 
             await ButtonManager.click('quit_chat');
             return info;
+        }
+    };
+
+    var EmeiHelper = {
+        async passGate () {
+            let combat = new Combat();
+            combat.initialize(new Npc('看山弟子'), '比试');
+            await combat.fire();
+
+            await Navigation.move('n');
+
+            let retry = new Retry();
+            retry.initialize(async function escape () {
+                await ButtonManager.click('escape');
+            }, CombatStatus.justFinished);
+            await retry.fire();
         }
     };
 
@@ -4652,6 +4668,7 @@ window.setTimeout(function () {
                 '草原': 'jh 26;w',
                 '无名山峡谷': 'jh 29;#4 n',
                 '无名峡谷': 'jh 29;#4 n;event_1_60035830;event_1_65661209',
+                '九老洞': 'jh 8;w;nw;#4 n;e;e;n;n;e;@EmeiHelper.passGate();#3 n;w;#9 n;nw;sw;w;nw;w',
 
                 '饮风客栈': 'jh 1',
                 '龙门石窟': 'jh 2',
@@ -4945,8 +4962,16 @@ window.setTimeout(function () {
                 if (steps[i].includes('#wait ')) {
                     await ExecutionManager.wait(parseInt(steps[i].split(' ')[1]));
                 } else {
-                    let command = steps[i][0] !== '~' ? "clickButton('" + steps[i] + "')" : Objects.Room.getEventByName(steps[i].substr(1));
-                    await ExecutionManager.asyncExecute(command);
+                    switch (steps[i][0]) {
+                        case '~':
+                            await ExecutionManager.asyncExecute("clickButton('" + steps[i] + "')");
+                            break;
+                        case '@':
+                            await eval(steps[i].substr(1));
+                            break;
+                        default:
+                            await ExecutionManager.asyncExecute("clickButton('" + steps[i] + "')");
+                    }
                 }
             }
         }
@@ -5428,6 +5453,14 @@ window.setTimeout(function () {
                 if (window.confirm('确定去西安云远寺地室？')) {
                     Navigation.move(PathManager.getPathForSpecificEvent('云远寺地室'));
                 }
+            }
+        }, {
+            label: '九老洞',
+            title: '一键到九老洞',
+            id: 'id-goto-night-old-cave',
+
+            async eventOnClick () {
+                await Navigation.move(PathManager.getPathByRoom('九老洞'));
             }
         }, {
             label: '蜀山剑派',
