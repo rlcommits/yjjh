@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.85
+// @version      2.1.86
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5727,7 +5727,7 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 let answer = window.prompt('请按格式确认只杀哪些 npc...\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Match());
-                if (!answer) return;
+                if (!answer && answer !== '') return;
 
                 TianjianValleyHelper.setRegexExpression4Match(answer);
             }
