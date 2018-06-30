@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.83
+// @version      2.1.84
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5460,7 +5460,9 @@ window.setTimeout(function () {
             id: 'id-goto-night-old-cave',
 
             async eventOnClick () {
-                await Navigation.move(PathManager.getPathByRoom('九老洞'));
+                if (window.confirm('确定去峨眉山九老洞？（中途有战斗且不能停止）')) {
+                    await Navigation.move(PathManager.getPathByRoom('九老洞'));
+                }
             }
         }, {
             label: '蜀山剑派',
