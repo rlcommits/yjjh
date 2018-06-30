@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.86
+// @version      2.1.87
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -125,6 +125,8 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_MATCH: 'map.cleaner.reg.match',
             MAP_CLEANER_REG_EXCLUDED_TIANJIAN: 'map.cleaner.reg.execluded.tianjian',
             MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
+            MAP_CLEANER_TIANJIAN_ROOM_NAME: 'map.cleaner.room.name',
+            MAP_CLEANER_TIANJIAN_INTERVAL: 'map.cleaner.interval',
             CLAN_BATTLE_PLACE: 'clan.battle.place.remote',
             ITEMS_TO_SELL: 'packing.sell',
             ITEMS_TO_SPLIT: 'packing.split',
@@ -3243,6 +3245,10 @@ window.setTimeout(function () {
                 return $('button').filter(function () { return !eventName || $(this).text() === eventName; }).attr('onclick');
             },
 
+            getEventByNameReg (regEventName) {
+                return $('button').filter(function () { return !regEventName || $(this).text().match(regEventName); }).attr('onclick');
+            },
+
             getMapId () {
                 return System.globalObjectMap.get('msg_room').get('map_id');
             },
@@ -3376,7 +3382,7 @@ window.setTimeout(function () {
         _bodySearch: false,
         _maxEnforce: true,
 
-        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true) {
+        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true, roomName = '') {
             debugging('初始化地图清理模式...');
 
             GenericMapCleaner._stop = false;
@@ -3386,6 +3392,7 @@ window.setTimeout(function () {
             GenericMapCleaner._regexExpressionFilter = regexExpressionFilter;
             GenericMapCleaner._bodySearch = bodySearch;
             GenericMapCleaner._maxEnforce = maxEnforce;
+            GenericMapCleaner._roomName = roomName;
 
             GenericMapCleaner._retry.initialize(GenericMapCleaner._killAndMove, function stopWhen () {
                 return GenericMapCleaner._stop;
@@ -3394,6 +3401,20 @@ window.setTimeout(function () {
 
         async _killAndMove () {
             debugging('开始房间清理...');
+
+            if (GenericMapCleaner._roomName && !GenericMapCleaner._travelsalByGivenPath) {
+                debugging('检查房间名字匹配规则...');
+                let event = Objects.Room.getEventByNameReg(GenericMapCleaner._roomName);
+                if (event) {
+                    await ExecutionManager.asyncExecute(event);
+                    GenericMapCleaner._stop = true;
+                    debugging('房间名字与预设值匹配成功。');
+                } else {
+                    await ButtonManager.click(Objects.Room.getDirectionByRandom(), 100);
+                }
+
+                return;
+            }
 
             await Objects.Room.refresh();
             let npcs = GenericMapCleaner._locateAvailableNpcs(GenericMapCleaner._regexExpressionFilter);
@@ -3511,6 +3532,22 @@ window.setTimeout(function () {
 
         setRegexExpression4Exclusion (regKeywords) {
             System.setVariant(System.keys.MAP_CLEANER_REG_EXCLUDED_TIANJIAN, regKeywords);
+        },
+
+        getInterval () {
+            return System.getVariant(System.keys.MAP_CLEANER_TIANJIAN_INTERVAL, 1500);
+        },
+
+        setInterval (interval) {
+            System.setVariant(System.keys.MAP_CLEANER_TIANJIAN_INTERVAL, interval);
+        },
+
+        getRoomName () {
+            return System.getVariant(System.keys.MAP_CLEANER_TIANJIAN_ROOM_NAME);
+        },
+
+        setRoomName (roomName) {
+            System.setVariant(System.keys.MAP_CLEANER_TIANJIAN_ROOM_NAME, roomName);
         }
     };
 
@@ -5710,7 +5747,7 @@ window.setTimeout(function () {
 
                     if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
                         let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
-                        GenericMapCleaner.initialize(false, [], 2000, filter, false, true);
+                        GenericMapCleaner.initialize(false, [], TianjianValleyHelper.getInterval(), filter, false, true, TianjianValleyHelper.getRoomName());
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -5740,6 +5777,29 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按格式 (比如 天剑谷卫士|虹雷) 填入跳过不打的 npc 关键字。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：天剑谷卫士|虹雷\n2. 只需关键字，不需全名：卫士|虹\n3. 支持正则表达式语法', TianjianValleyHelper.getRegexExpression4Exclusion());
                 if (answer || answer === '') {
                     TianjianValleyHelper.setRegexExpression4Exclusion(answer);
+                }
+            }
+        }, {
+            label: '地',
+            title: '特别指定不打的目标...\n\n注意：\n此设置优先于左边选项',
+            width: '38px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请设置特别关注的地点关键字，比如湖边。不设置则完全随机。\n\n格式说明：\n1. 可用竖线隔开多种不同关键字：湖边|巨石\n2. 支持正则表达式语法', TianjianValleyHelper.getRoomName());
+                if (answer || answer === '') {
+                    TianjianValleyHelper.setRoomName(answer);
+                }
+            }
+        }, {
+            label: '频',
+            title: '指定发起战斗的毫秒频率，越低间隔越小...\n\n注意：\n太小可能造成 npc 检测错误，建议多次调试寻找最佳值。',
+            width: '38px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入战斗结束后如果检测到现场有 npc，发起下一场战斗的毫秒数。', TianjianValleyHelper.getInterval());
+                if (parseInt(answer)) {
+                    TianjianValleyHelper.setInterval(answer);
                 }
             }
         }, {
