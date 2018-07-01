@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.87
+// @version      2.1.88
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1977,22 +1977,22 @@ window.setTimeout(function () {
                         break;
                     }
 
-                    if (candidates[i].getTalked()) {
-                        continue;
-                    } else if (!candidates[i].getAvailability()) {
-                        if (i >= 4 || window.confirm(candidates[i].getName() + '当前无法对话，确定跳过继续？按取消可退出本轮对话。')) {
-                            debugging(candidates[i].getName() + ' skipped.');
-                            continue;
-                        }
-
-                        break;
-                    }
+                    if (candidates[i].getTalked()) continue;
 
                     if (candidates[i].isFavorabilityMax()) {
                         await getFruitsDirectly(candidates[i]);
                         candidates[i].setTalked(true);
                         debugging('直接拿到果子。');
                         continue;
+                    }
+
+                    if (!candidates[i].getAvailability()) {
+                        if (i >= 4 || window.confirm(candidates[i].getName() + '当前无法对话，确定跳过继续？按取消可退出本轮对话。')) {
+                            debugging(candidates[i].getName() + ' 已经选择跳过。');
+                            continue;
+                        }
+
+                        break;
                     }
 
                     await KnightManager.capture(candidates[i].getName());
