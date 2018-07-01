@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.88
+// @version      2.1.89
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1746,11 +1746,87 @@ window.setTimeout(function () {
         }
     };
 
+    class Skill {
+        constructor (name, id) {
+            this._name = name;
+            this._id = id;
+        }
+
+        getId () {
+            return this._id;
+        }
+
+        getName () {
+            return this._name;
+        }
+    };
+
+    var SkillHelper = {
+        getSkillByName (name) {
+            let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
+            if (record.length) {
+                let matches = record.split(',');
+            }
+        },
+
+        Breakthrough: {
+            getCurrentLevel () {
+            },
+
+            getTargetLevel () {
+
+            },
+
+            async continue (skill) {
+                await ButtonManager.click(`tuopo go,${skill.getId()}`);
+            },
+
+            setConfiguration () {
+
+            },
+
+            getConfiguration () {
+
+            }
+        }
+    };
+
     var MonitorCenter = {
+        Breakthrough: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'main_msg'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('突破监控');
+            },
+
+            done (message) {
+                return message.get('msg').startsWith('[1;33m成功突破。');
+            },
+
+            async continue (message) {
+                debugging('判定是否需要继续突破...');
+                let matches = message.get('msg').match('你的(.*?)成功突破了');
+                if (matches) {
+                    let skill = SkillHelper.getSkillByName(matches[1]);
+                    let currentLevel = SkillHelper.Breakthrough.getCurrentLevel(skill);
+                    let targetLevel = SkillHelper.Breakthrough.getTargetLevel(skill);
+
+                    if (currentLevel < targetLevel) {
+                        debugging(`当前等级 ${currentLevel} 小于目标等级 ${targetLevel}，开始尝试继续突破...`);
+
+                        await SkillHelper.Breakthrough.continue(skill);
+                        log(`开始突破${skill.getName()}，${currentLevel}->${targetLevel}`);
+                    }
+                }
+            }
+        },
+
         Sleep: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('睡床监控', MonitorCenter.Sleep.done, MonitorCenter.Sleep.continue, 'main_msg'));
-                InterceptorRegistry.register(new Interceptor('睡床失败检测', MonitorCenter.Sleep.failed2Sleep, MonitorCenter.Sleep.retry, 'notice', 'notify_fail'));
+                InterceptorRegistry.register(new Interceptor('睡床失败检测', MonitorCenter.Sleep.failed, MonitorCenter.Sleep.retry, 'notice', 'notify_fail'));
             },
 
             turnOff () {
@@ -1763,11 +1839,11 @@ window.setTimeout(function () {
             },
 
             continue (message) {
-                log('睡床自动继续...');
+                log('尝试睡床自动继续...');
                 ButtonManager.click('sleep_hanyuchuang');
             },
 
-            failed2Sleep (message) {
+            failed (message) {
                 return message.get('msg').startsWith('这儿没有寒玉床');
             },
 
@@ -1780,10 +1856,12 @@ window.setTimeout(function () {
         Dazuo: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('打坐监控', MonitorCenter.Dazuo.done, MonitorCenter.Dazuo.continue, 'main_msg'));
+                InterceptorRegistry.register(new Interceptor('打坐失败监控', MonitorCenter.Dazuo.failed, MonitorCenter.Dazuo.retry, 'notice', 'notify_fail'));
             },
 
             turnOff () {
                 InterceptorRegistry.unregister('打坐监控');
+                InterceptorRegistry.unregister('打坐失败监控');
             },
 
             done (message) {
@@ -1791,8 +1869,17 @@ window.setTimeout(function () {
             },
 
             continue (message) {
-                log('打坐监控条件被触发，自动继续打坐...');
+                log('尝试自动继续打坐...');
                 ButtonManager.click('exercise');
+            },
+
+            failed (message) {
+                return message.get('msg').includes('不能练打坐');
+            },
+
+            retry (message) {
+                log('暂时无法打坐。5 分钟后自动重试...');
+                window.setTimeout(MonitorCenter.Dazuo.continue, 5 * 60 * 1000);
             }
         }
     };
@@ -3061,6 +3148,14 @@ window.setTimeout(function () {
                         break;
                     }
                 }
+            },
+
+            getCurrentTupoLevel (name) {
+
+            },
+
+            getTargetTupoLevel (name) {
+
             }
         },
 
@@ -5097,14 +5192,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '打坐练习',
-            title: '重新开始练习技能和打坐...\n\n注意：如当前有正在练习的技能，会自动检测重新练习，否则提示确认技能名字。当前版本暂不支持恢复原准备技能。',
-
-            async eventOnClick () {
-                await ButtonManager.click('exercise stop;exercise');
-                await SkillManager.restartPractice();
-            }
-        }, {
             label: '挂青蛇',
             title: '自动挂机杀洛阳青蛇获取每天 20 玄武/青龙/朱雀/白虎 碎片...',
             id: 'id-snake-killer',
@@ -5165,6 +5252,40 @@ window.setTimeout(function () {
                 }
             }
         }, {
+            label: '突破',
+            title: '点下时制定技能突破结束事件会自动触发继续突破。\n\n注意：\n1. 必须预先技能名和目标等级。\n2. 必须准备足够的(普通/高级)突破丹在背包。',
+            id: 'id-continue-breakthrough',
+            width: '60px',
+            marginRight: '1px',
+            hidden: true,
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (!SkillHelper.Breakthrough.getConfiguration()) {
+                        ButtonManager.resetButtonById(this.id);
+
+                        $('#id-continue-breakthrough-setting').click();
+                    } else {
+                        MonitorCenter.Breakthrough.turnOn();
+                    }
+                } else {
+                    MonitorCenter.Breakthrough.turnOff();
+                }
+            }
+        }, {
+            label: '.',
+            title: '设置突破细节...',
+            id: 'id-continue-breakthrough-setting',
+            width: '10px',
+            hidden: true,
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式输入要自动突破的技能和目标等级，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3...\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
+                if (answer || answer === '') {
+                    SkillHelper.Breakthrough.setConfiguration(answer);
+                }
+            }
+        }, {
             label: '自动跟招',
             title: '此开关打开可以根据队友的出招选择能组成阵法的技能出招...',
             id: 'id-auto-follower-best-skill',
@@ -5217,7 +5338,6 @@ window.setTimeout(function () {
             label: '.',
             title: '设置战斗装备...',
             width: '10px',
-            marginRight: '1px',
 
             async eventOnClick () {
                 let answer = window.prompt('请按顺序输入战斗模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_COMBAT, EquipmentHelper.combatItemsByDefault));
@@ -5246,7 +5366,6 @@ window.setTimeout(function () {
             label: '.',
             title: '设置学习装备...',
             width: '10px',
-            marginRight: '1px',
 
             async eventOnClick () {
                 let answer = window.prompt('请按顺序输入学习模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_STUDY, EquipmentHelper.studyItemsByDefault));
