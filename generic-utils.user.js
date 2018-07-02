@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.89
+// @version      2.1.90
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2695,7 +2695,7 @@ window.setTimeout(function () {
                 if (CombatStatus.inProgress()) return;
 
                 if (User.attributes.getCurrentKee() < User.attributes.getMaxKee()) {
-                    await ButtonManager.click('#3 recovery', 250);
+                    await ButtonManager.click('#3 recovery', 300);
                 }
 
                 if (User.attributes.getCurrentForce() < User.attributes.getMaxForce() * 0.9) {
@@ -2722,7 +2722,7 @@ window.setTimeout(function () {
                 log('内力已足 (' + currentForce + '/' + maxForce + ')，无需服用灵芝。');
             } else {
                 let times = parseInt(gap / 5000);
-                await ButtonManager.click('#' + times + ' items use snow_qiannianlingzhi', 250);
+                await ButtonManager.click('#' + times + ' items use snow_qiannianlingzhi', 300);
                 log('服用 ' + times + ' 棵千年灵芝，当前状态 ' + currentForce + '/' + maxForce);
             }
         }
