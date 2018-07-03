@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.90
+// @version      2.1.91
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -54,7 +54,7 @@ window.setTimeout(function () {
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
         debugMode: false,
-        scriptLoaded: false,
+        loadingScriptInProgress: false,
 
         _uid: '',
         _automatedReconnect: false,
@@ -67,17 +67,23 @@ window.setTimeout(function () {
             if (!System._uid) System._uid = User.getId();
         },
 
+        resetTitle () {
+            document.title = System.isLocalServer() ? User.getName() : User.getName() + '-跨服';
+        },
+
         setVariant (key, value) {
             System._initializeUid();
+            let keyWithEnvInfo = System.isLocalServer() ? key : `${key}.remote`;
 
-            window.GM_setValue(`${System._uid}.${key}`, value);
+            window.GM_setValue(`${System._uid}.${keyWithEnvInfo}`, value);
         },
 
         getVariant (key, defaultValue) {
             System._initializeUid();
+            let keyWithEnvInfo = System.isLocalServer() ? key : `${key}.remote`;
 
-            let currentValue = window.GM_getValue(`${System._uid}.${key}`);
-            if (!currentValue && defaultValue) {
+            let currentValue = window.GM_getValue(`${System._uid}.${keyWithEnvInfo}`);
+            if (!currentValue && (defaultValue || defaultValue === 0)) {
                 System.setVariant(key, defaultValue);
 
                 return defaultValue;
@@ -88,6 +94,28 @@ window.setTimeout(function () {
 
         isLocalServer () {
             return User.getArea() < 1000;
+        },
+
+        switchToRemoteServer () {
+            window.unsafeWindow.g_world_ip = 'sword-inter1-direct.yytou.cn';
+            window.unsafeWindow.g_world_port = 8881;
+            window.unsafeWindow.g_world_uid = System.globalObjectMap.get('msg_attrs').get('id').replace('u', '') + `-${User.getArea()}a1a`;
+            window.unsafeWindow.sock.close();
+            window.unsafeWindow.sock = 0;
+            window.unsafeWindow.g_gmain.g_delay_connect = 0;
+
+            window.unsafeWindow.connectServer();
+        },
+
+        switchToLocalServer () {
+            window.unsafeWindow.g_world_uid = 0;
+            window.unsafeWindow.g_world_port = 0;
+            window.unsafeWindow.g_world_ip = 0;
+            window.unsafeWindow.sock.close();
+            window.unsafeWindow.sock = 0;
+            window.unsafeWindow.g_gmain.g_delay_connect = 0;
+
+            window.unsafeWindow.connectServer();
         },
 
         setDebugMessageBlacklist (blacklist) {
@@ -109,9 +137,7 @@ window.setTimeout(function () {
             TEAMWORK_LEAD_ID: 'teamwork.lead.id',
             KEY_KNIGHT_NAME: 'knight.name',
             DRAGON_REG_MATCH: 'dragon.reg.match',
-            DRAGON_REG_MATCH_REMOTE: 'dragon.reg.match.remote',
             DRAGON_REG_EXCLUDED: 'dragon.reg.excluded',
-            DRAGON_REG_EXCLUDED_REMOTE: 'dragon.reg.excluded.remote',
             RECOVERY_SKILL: 'recovery.skill',
             RECOVERY_THRESHOLD: 'recovery.threshold',
             DEBUG_MESSAGE_REJECTED: 'debug.message.rejected',
@@ -127,7 +153,7 @@ window.setTimeout(function () {
             MAP_CLEANER_REG_MATCH_TIANJIAN: 'map.cleaner.reg.match.tianjian',
             MAP_CLEANER_TIANJIAN_ROOM_NAME: 'map.cleaner.room.name',
             MAP_CLEANER_TIANJIAN_INTERVAL: 'map.cleaner.interval',
-            CLAN_BATTLE_PLACE: 'clan.battle.place.remote',
+            CLAN_BATTLE_PLACE: 'clan.battle.place',
             ITEMS_TO_SELL: 'packing.sell',
             ITEMS_TO_SPLIT: 'packing.split',
             ITEMS_TO_STORE: 'packing.store',
@@ -137,6 +163,16 @@ window.setTimeout(function () {
             EQUIPMENT_COMBAT: 'equipment.combat',
             EQUIPMENT_STUDY: 'equipment.study',
             GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas'
+        },
+
+        logCurrentSettings () {
+            log('************************************当前用户设置***************************************************');
+            log(`自动出招：${System.getVariant(System.keys.ATTACK_SKILLS)} - 预留 ${System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)} 气`);
+            log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
+            log(`快捷队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
+            log(`青龙匹配：${System.getVariant(System.keys.DRAGON_REG_MATCH)}`);
+            log(`青龙排除：${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
+            log('**************************************************************************************************');
         },
 
         setAutomatedReconnect (automatedReconnect) {
@@ -162,9 +198,11 @@ window.setTimeout(function () {
             }
         },
 
-        loadLastButtonStatus () {
+        refreshButtonStatus () {
             let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
             log('读取上次激活的按钮...', ids);
+
+            System.loadingScriptInProgress = false;
 
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
@@ -174,10 +212,12 @@ window.setTimeout(function () {
                     }
                 }
             }
+
+            System.loadingScriptInProgress = true;
         },
 
         saveCurrentButtonStatus () {
-            if (!System.scriptLoaded) return;
+            if (!System.loadingScriptInProgress) return;
             if (!System.isLocalServer()) return;
 
             let ids = [];
@@ -203,22 +243,7 @@ window.setTimeout(function () {
             await analyseEnforce();
             await Objects.Room.refresh();
 
-            logCurrentSettings();
-
-            function logCurrentSettings () {
-                log('************************************当前用户设置***************************************************');
-                log(`自动出招设置：${System.getVariant(System.keys.ATTACK_SKILLS)} - 预留 ${System.getVariant(System.keys.ATTACK_SKILLS_BUFFER_RESERVED)} 气`);
-                log(`回血内功：${System.getVariant(System.keys.RECOVERY_SKILL)}，吸气阈值 ${System.getVariant(System.keys.RECOVERY_THRESHOLD)}`);
-                log(`快捷组队指定队长：${System.getVariant(System.keys.TEAMWORK_LEAD_NAME)}/${System.getVariant(System.keys.TEAMWORK_LEAD_ID)}`);
-                log(`默认每日一次任务序号：${System.getVariant(System.keys.DAILY_ONEOFF_TASK_INDEX)}`);
-                log(`正在撩的奇侠：${System.getVariant(System.keys.KEY_KNIGHT_NAME)}`);
-                log(`一键森林起点：${System.getVariant(System.keys.FOREST_STARTPOINT_PATH_ALIAS)}=${System.getVariant(System.keys.FOREST_STARTPOINT_PATH)}`);
-                log(`一键森林扫荡路径：${System.getVariant(System.keys.FOREST_TRAVERSAL_PATH)}`);
-                log(`本服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED)}`);
-                log(`跨服青龙：匹配 ${System.getVariant(System.keys.DRAGON_REG_MATCH_REMOTE)}，排除 ${System.getVariant(System.keys.DRAGON_REG_EXCLUDED_REMOTE)}`);
-                log(`调试信息屏蔽：${System.getVariant(System.keys.DEBUG_MESSAGE_REJECTED)}`);
-                log('**************************************************************************************************');
-            }
+            System.logCurrentSettings();
 
             async function analyseEnforce () {
                 if (parseInt(System.globalObjectMap.get('msg_attrs').get('force_factor'))) {
@@ -1609,7 +1634,7 @@ window.setTimeout(function () {
 
         Constructure: {
             async createTeamIfNeeded () {
-                if (!System.scriptLoaded) return;
+                if (!System.loadingScriptInProgress) return;
 
                 if (!System.globalObjectMap.get('msg_team').get('team_id')) {
                     if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
@@ -3197,7 +3222,7 @@ window.setTimeout(function () {
             },
 
             getItemQuantityByName (name = '') {
-                let records = System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(`,${name},`));
+                let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.replaceControlCharBlank(v['value']).includes(`,${name},`));
                 if (records.length === 0) return 0;
 
                 return parseInt(records[0]['value'].split(',')[2]);
@@ -3380,6 +3405,14 @@ window.setTimeout(function () {
                         break;
                     case '观战':
                         ButtonManager.click('watch_vs ' + npc.getId());
+                        break;
+                    case '销毁生死簿（银两）':
+                        await ExecutionManager.asyncExecute(Objects.Room.getNpcDomById(npc.getId()).attr('onclick'), 1000);
+                        for (let i = 0; i < times; i++) {
+                            await ExecutionManager.asyncExecute(Objects.Npc.getActionLink('销毁生死簿（银两）'), 200);
+                            await ExecutionManager.asyncExecute(Objects.Npc.getActionLink('确定'), 200);
+                        }
+
                         break;
                     default:
                         await ExecutionManager.asyncExecute(Objects.Room.getNpcDomById(npc.getId()).attr('onclick'), 1000);
@@ -3907,7 +3940,10 @@ window.setTimeout(function () {
                 }
 
                 DragonMonitor.turnOffDragonHandler();
-                await Navigation.move('escape;prev;home');
+
+                if (!Objects.Room.getName().includes('武林广场')) {
+                    await Navigation.move('escape;prev;home');
+                }
             }
         },
 
@@ -3916,15 +3952,11 @@ window.setTimeout(function () {
         },
 
         getRegKeywords4ExcludedTargets () {
-            let key = System.isLocalServer() ? System.keys.DRAGON_REG_EXCLUDED : System.keys.DRAGON_REG_EXCLUDED_REMOTE;
-
-            return System.getVariant(key);
+            return System.getVariant(System.keys.DRAGON_REG_EXCLUDED);
         },
 
         setRegKeywords4ExcludedTargets (regKeywords) {
-            let key = System.isLocalServer() ? System.keys.DRAGON_REG_EXCLUDED : System.keys.DRAGON_REG_EXCLUDED_REMOTE;
-
-            System.setVariant(key, regKeywords);
+            System.setVariant(System.keys.DRAGON_REG_EXCLUDED, regKeywords);
         },
 
         getKillBadPeople () {
@@ -3936,20 +3968,11 @@ window.setTimeout(function () {
         },
 
         getRegKeywords () {
-            let key = System.isLocalServer() ? System.keys.DRAGON_REG_MATCH : System.keys.DRAGON_REG_MATCH_REMOTE;
-
-            return System.getVariant(key);
+            return System.getVariant(System.keys.DRAGON_REG_MATCH);
         },
 
         setRegKeywords (regKeywords) {
-            let key = System.isLocalServer() ? System.keys.DRAGON_REG_MATCH : System.keys.DRAGON_REG_MATCH_REMOTE;
-
-            System.setVariant(key, regKeywords);
-        },
-
-        resetMonitoringSettings () {
-            ButtonManager.resetButtonById('id-dragon-monitor-kill-good');
-            ButtonManager.resetButtonById('id-dragon-monitor-kill-bad');
+            System.setVariant(System.keys.DRAGON_REG_MATCH, regKeywords);
         }
     };
 
@@ -4229,6 +4252,8 @@ window.setTimeout(function () {
         async resolveDeathBookIfAny () {
             let bookQuantity = Panels.Backpack.getItemQuantityByName('生死簿');
             if (bookQuantity) {
+                if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
+
                 await Objects.Npc.action(new Npc('杜宽'), '销毁生死簿（银两）', bookQuantity);
                 log(`销毁生死簿：${bookQuantity} 本`);
             }
@@ -5580,24 +5605,17 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
-
                     await DeathHelper.resolveDeathBookIfAny();
 
-                    await ButtonManager.click('event_1_36344468');
+                    System.switchToRemoteServer();
+
                     await ExecutionManager.wait(1000);
-
-                    if (!document.title.includes('-跨服')) document.title = User.getName() + '-跨服';
-
                     $('#id-equipment-for-combat').click();
 
                     await ExecutionManager.wait(2000);
                     ButtonManager.pressDown('id-recover-hp-mp');
                 } else {
-                    await Navigation.move('home;home;home;home');
-                    document.title = User.getName();
-
-                    DragonMonitor.resetMonitoringSettings();
+                    System.switchToLocalServer();
                 }
             }
         }, {
@@ -7604,7 +7622,7 @@ window.setTimeout(function () {
 
     User.initialize();
 
-    function inintializeHelpButtons (conf) {
+    function initializeHelpButtons (conf) {
         HelperUiManager.loadConfigurations(conf);
         HelperUiManager.drawFunctionalGroups();
         HelperUiManager.drawControlCheckboxes();
@@ -7614,10 +7632,20 @@ window.setTimeout(function () {
         ButtonManager.pressDown('id-continue-dazuo');
         $('#测试中功能').click();
 
-        System.loadLastButtonStatus();
+        System.refreshButtonStatus();
     }
 
-    inintializeHelpButtons(helperConfigurations);
+    function initializeGenericInterceptors () {
+        InterceptorRegistry.register(new Interceptor('跨服切换检测', function WorldChangedetected (message) {
+            return true;
+        }, function reloadButtonStatus (message) {
+            System.refreshButtonStatus();
+            System.resetTitle();
+        }, 'g_login', 'status'));
+    }
+
+    initializeHelpButtons(helperConfigurations);
+    initializeGenericInterceptors();
 
     window.unsafeWindow.webSocketMsg.prototype.originalDispatchMessage = window.unsafeWindow.gSocketMsg.dispatchMessage;
     window.unsafeWindow.gSocketMsg.dispatchMessage = function (message) {
@@ -7628,7 +7656,7 @@ window.setTimeout(function () {
         InterceptorRegistry.getInterceptors(message.get('type'), message.get('subtype')).forEach(v => v.handle(message));
     };
 
+    System.resetTitle();
+
     log('脚本加载完毕。');
-    System.scriptLoaded = true;
-    document.title = User.getName();
 }, 2000);
