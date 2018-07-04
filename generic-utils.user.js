@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.91
+// @version      2.1.92
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -191,10 +191,13 @@ window.setTimeout(function () {
 
         async refreshPageIfConnectionDropped () {
             if (!window.unsafeWindow.sock) {
-                System.saveCurrentButtonStatus();
                 await ExecutionManager.wait(2000);
 
-                window.unsafeWindow.location.reload();
+                if (window.document.title.includes('-跨服')) {
+                    System.switchToRemoteServer();
+                } else {
+                    System.switchToLocalServer();
+                }
             }
         },
 
@@ -2355,6 +2358,22 @@ window.setTimeout(function () {
 
         maximizeEnforce () {
             ButtonManager.click(`enforce ${User.attributes.getMaxEnforce()}`, 0);
+        },
+
+        refreshButtonStatus (message) {
+            let button = $('#id-enforce');
+
+            if (message.get('msg').startsWith('你决定每次使用0点内力伤敌。')) {
+                debugging('设置恢复加力...');
+                button.text('恢复加力');
+                button.css('color', 'red');
+                button.attr('title', '点击可开启当前最大加力');
+            } else {
+                debugging('设置取消加力...');
+                button.text('取消加力');
+                button.css('color', 'black');
+                button.attr('title', '点击可设置加力为 0');
+            }
         }
     };
 
@@ -7636,12 +7655,18 @@ window.setTimeout(function () {
     }
 
     function initializeGenericInterceptors () {
-        InterceptorRegistry.register(new Interceptor('跨服切换检测', function WorldChangedetected (message) {
+        InterceptorRegistry.register(new Interceptor('跨服切换检测', function worldChangeDetected (message) {
             return true;
         }, function reloadButtonStatus (message) {
             System.refreshButtonStatus();
             System.resetTitle();
         }, 'g_login', 'status'));
+
+        InterceptorRegistry.register(new Interceptor('加力检测', function enforceChangeDetected (message) {
+            return message.get('msg').includes('你决定每次使用');
+        }, function resetEnforceButtonStatus (message) {
+            EnforceHelper.refreshButtonStatus(message);
+        }, 'main_msg'));
     }
 
     initializeHelpButtons(helperConfigurations);
