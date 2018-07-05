@@ -124,7 +124,7 @@ window.setTimeout(function () {
         handle (message) {
             if (this._criterial(message)) {
                 debugging(`拦截器'${this._alias}'被触发...`);
-                 
+
                 this._behavior(message);
                 return true;
             }
@@ -1857,7 +1857,6 @@ window.setTimeout(function () {
             },
 
             battleHappened (message) {
-                debugging('Checking if battle happened...');
                 return message.get('msg').match('^你对著.*?喝道：.*?看你实在不顺眼，去死吧');
             },
 
@@ -5079,7 +5078,7 @@ window.setTimeout(function () {
                 return;
             }
 
-            debugging('检查是否需要逃跑...');            
+            debugging('检查是否需要逃跑...');
             if (CombatStatus.inProgress()) {
                 debugging('开始尝试逃跑...');
 
@@ -5090,7 +5089,7 @@ window.setTimeout(function () {
 
                 await retry.fire();
 
-                debugging('逃跑结束。');                
+                debugging('逃跑结束。');
             }
         }
     };
