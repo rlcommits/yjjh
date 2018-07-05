@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.96
+// @version      2.1.97
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -156,7 +156,7 @@ window.setTimeout(function () {
             let currentValue = window.GM_getValue(`${User.getId()}.${key}`);
             debugging(`getting value for ${User.getId()}.${key}: ${currentValue}`);
 
-            if (!currentValue && (defaultValue || defaultValue === 0)) {
+            if ((!currentValue && currentValue !== '' && currentValue !== 0) && (defaultValue || defaultValue === 0)) {
                 System.setVariant(key, defaultValue);
 
                 return defaultValue;
