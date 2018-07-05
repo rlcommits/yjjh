@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.92
+// @version      2.1.93
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -37,9 +37,9 @@ window.setTimeout(function () {
         getInterval () {
             return this._interval;
         }
-    }
+    };
 
-    var JobManager = {
+    var JobRegistry = {
         _jobs: [],
 
         register (id, interval, startEvent) {
@@ -48,6 +48,86 @@ window.setTimeout(function () {
 
         getJob (id) {
             return this._jobs.filter(v => v.getId() === id)[0];
+        }
+    };
+
+    class Retry {
+        constructor (interval = 1000) {
+            this._interval = interval;
+        }
+
+        initialize (retryEvent, teminateCriterial) {
+            this._retryEvent = retryEvent;
+            this._terminateCriterial = teminateCriterial;
+
+            this._stop = false;
+        }
+
+        async fire () {
+            if (!this._stop && (!this._terminateCriterial || !this._terminateCriterial())) {
+                await this._retryEvent();
+                await ExecutionManager.wait(this._interval);
+
+                await this.fire();
+            }
+        }
+
+        stop () {
+            this._stop = true;
+        }
+    };
+
+    var InterceptorRegistry = {
+        _interceptors: [],
+
+        register (interceptor) {
+            if (this._interceptors.includes(interceptor)) {
+                log('拦截器已经存在，不再重复注册：' + interceptor.getAlias());
+                return;
+            }
+
+            log('注册拦截器：' + interceptor.getAlias());
+            this._interceptors.push(interceptor);
+        },
+
+        unregister (alias) {
+            log('注销拦截器：' + alias);
+            this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)), 1);
+        },
+
+        getInterceptors (type, subtype) {
+            return this._interceptors.filter(v => (!type || v.getType() === type) && (!subtype || v.getSubtype() === subtype));
+        }
+    };
+
+    class Interceptor {
+        constructor (alias, criterial, behavior, type, subtype) {
+            this._alias = alias;
+            this._criterial = criterial;
+            this._behavior = behavior;
+            this._type = type;
+            this._subtype = subtype;
+        }
+
+        getAlias () {
+            return this._alias;
+        }
+
+        getType () {
+            return this._type;
+        }
+
+        getSubtype () {
+            return this._subtype;
+        }
+
+        handle (message) {
+            if (this._criterial(message)) {
+                debugging(`拦截器'${this._alias}'被触发...`);
+                 
+                this._behavior(message);
+                return true;
+            }
         }
     };
 
@@ -526,7 +606,7 @@ window.setTimeout(function () {
             await ExecutionManager.wait(2000);
             return this.fight();
         }
-    }
+    };
 
     class Npc {
         constructor (name, id = '') {
@@ -556,7 +636,7 @@ window.setTimeout(function () {
         toString () {
             return this._name + '/' + this._id;
         }
-    }
+    };
 
     class Item {
         constructor (name, id = '', quantity = 1) {
@@ -587,57 +667,6 @@ window.setTimeout(function () {
 
         toString () {
             return this._name + '/' + this._id;
-        }
-    };
-
-    var InterceptorRegistry = {
-        _interceptors: [],
-
-        register (interceptor) {
-            if (this._interceptors.includes(interceptor)) {
-                log('拦截器已经存在，不再重复注册：' + interceptor.getAlias());
-                return;
-            }
-
-            log('注册拦截器：' + interceptor.getAlias());
-            this._interceptors.push(interceptor);
-        },
-
-        unregister (alias) {
-            log('注销拦截器：' + alias);
-            this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)), 1);
-        },
-
-        getInterceptors (type, subtype) {
-            return this._interceptors.filter(v => (!type || v.getType() === type) && (!subtype || v.getSubtype() === subtype));
-        }
-    };
-
-    class Interceptor {
-        constructor (alias, criterial, behavior, type, subtype) {
-            this._alias = alias;
-            this._criterial = criterial;
-            this._behavior = behavior;
-            this._type = type;
-            this._subtype = subtype;
-        }
-
-        getAlias () {
-            return this._alias;
-        }
-
-        getType () {
-            return this._type;
-        }
-
-        getSubtype () {
-            return this._subtype;
-        }
-
-        handle (message) {
-            if (this._criterial(message)) {
-                this._behavior(message);
-            }
         }
     };
 
@@ -949,7 +978,7 @@ window.setTimeout(function () {
                 debugging('上一次记录位置 ' + IdleChecker._lastRoom + ' 自动更新成 ' + currentRoom);
                 IdleChecker._lastRoom = currentRoom;
             } else {
-                log('检测到在外面发呆超过 ' + JobManager.getJob('id-idle-checker').getInterval() / (1000 * 60) + ' 分钟，安全起见自动打道回府。');
+                log('检测到在外面发呆超过 ' + JobRegistry.getJob('id-idle-checker').getInterval() / (1000 * 60) + ' 分钟，安全起见自动打道回府。');
                 ButtonManager.click('home;look_room');
             }
         }
@@ -1072,7 +1101,6 @@ window.setTimeout(function () {
 
         async fire () {
             DailyOneOffTaskHelper._stop = false;
-            $('#id-escape').click();
 
             let todoTaskIndexRanges = DailyOneOffTaskHelper.getDefaultTaskIndexRange().split('-');
             let min = parseInt(todoTaskIndexRanges[0]);
@@ -1086,8 +1114,6 @@ window.setTimeout(function () {
                 log(DailyOneOffTaskHelper._tasksDefined[i]['item'] + '执行完毕。');
                 await Navigation.move('home');
             }
-
-            ButtonManager.resetButtonById('id-escape');
         },
 
         stop () {
@@ -1135,7 +1161,7 @@ window.setTimeout(function () {
         setTalked (talked) {
             this._talked = talked;
         }
-    }
+    };
 
     class CustomizedEvent {
         constructor (criterial, action) {
@@ -1150,7 +1176,7 @@ window.setTimeout(function () {
         getAction () {
             return this._action;
         }
-    }
+    };
 
     class Gem {
         constructor (name, level) {
@@ -1177,7 +1203,7 @@ window.setTimeout(function () {
         toString () {
             return !this._level ? this._name : this._level + '的' + this._name;
         }
-    }
+    };
 
     class GemsPack {
         constructor (gems = []) {
@@ -1228,7 +1254,7 @@ window.setTimeout(function () {
             }
             return result;
         }
-    }
+    };
 
     var GemHelper = {
         _gemLevels: ['碎裂', '裂开', '', '无暇', '完美'],
@@ -1454,7 +1480,7 @@ window.setTimeout(function () {
         getCode () {
             return this._code;
         }
-    }
+    };
 
     var Repeater = {
         _actionLink: '',
@@ -1794,6 +1820,7 @@ window.setTimeout(function () {
             let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
             if (record.length) {
                 let matches = record.split(',');
+                return matches[2];
             }
         },
 
@@ -1820,6 +1847,44 @@ window.setTimeout(function () {
     };
 
     var MonitorCenter = {
+        MurderPreventer: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('防杀气叫杀', MonitorCenter.MurderPreventer.battleHappened, MonitorCenter.MurderPreventer.escape, 'main_msg'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('防杀气叫杀');
+            },
+
+            battleHappened (message) {
+                debugging('Checking if battle happened...');
+                return message.get('msg').match('^你对著.*?喝道：.*?看你实在不顺眼，去死吧');
+            },
+
+            async escape (message) {
+                await ExecutionManager.wait(50);
+                EscapeHelper.tryOneoffEscape();
+            }
+        },
+
+        MapFragments: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('开地图监控', MonitorCenter.MapFragments.mapOpened, MonitorCenter.MapFragments.deliever, 'channel', 'clan'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('开地图监控');
+            },
+
+            mapOpened (message) {
+                return System.replaceControlCharBlank(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图。');
+            },
+
+            async deliever (message) {
+                ButtonManager.click('#4 clan bzmt puzz', 0);
+            }
+        },
+
         Breakthrough: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'main_msg'));
@@ -2220,6 +2285,8 @@ window.setTimeout(function () {
             await ExecutionManager.wait(500);
             ExecutionManager.execute(Objects.Room.filterTargetObjectsByKeyword('仔细搜索').attr('onclick'));
 
+            if (Objects.Room.getEventByName('扫荡')) $('#id-auto-sweep').click();
+
             async function identifyPlace () {
                 await ExecutionManager.asyncExecute("clickButton('open jhqx', 0)", 500);
                 let messages = Panels.Master.filterMessageObjectsByKeyword(KnightManager._REG_SECRET_TREASURE);
@@ -2296,7 +2363,7 @@ window.setTimeout(function () {
         async terminate () {
             this._stop = true;
         }
-    }
+    };
 
     var BodySearchHelper = {
         _search: new BodySearch(),
@@ -2313,32 +2380,6 @@ window.setTimeout(function () {
             BodySearchHelper._search.terminate();
         }
     };
-
-    class Retry {
-        constructor (interval = 1000) {
-            this._interval = interval;
-        }
-
-        initialize (retryEvent, teminateCriterial) {
-            this._retryEvent = retryEvent;
-            this._terminateCriterial = teminateCriterial;
-
-            this._stop = false;
-        }
-
-        async fire () {
-            if (!this._stop && (!this._terminateCriterial || !this._terminateCriterial())) {
-                await this._retryEvent();
-                await ExecutionManager.wait(this._interval);
-
-                await this.fire();
-            }
-        }
-
-        stop () {
-            this._stop = true;
-        }
-    }
 
     var EnforceHelper = {
         _enforceSnapshot: 0,
@@ -2554,7 +2595,7 @@ window.setTimeout(function () {
         getBufferRequired () {
             return this._bufferRequired;
         }
-    }
+    };
 
     class Combat {
         constructor (checkInerval = 200, printCombatInfo = false, zeroEnforce = false) {
@@ -2948,7 +2989,6 @@ window.setTimeout(function () {
 
         identifyFugitives () {
             let messages = Panels.Chatting.filterMessageObjectsByKeyword(/【系统】跨服：\[36-40区\](.*?)逃到了跨服时空(.*?)之中，众位英雄快来诛杀。/);
-            // let latestMessage = '【系统】[36-40区]段老大慌不择路，逃往了全真教-终南山路';
 
             if (messages.length) {
                 FugitiveSearchManager._targets = [new Fugitive(messages.last().text()), new Fugitive(messages.last().prev().text())];
@@ -2966,7 +3006,6 @@ window.setTimeout(function () {
     };
 
     var BanditSearchManager = {
-
         Const: {
             REG_BANDIT_APPEARS: '^【系统】(.*?)对着(.*?)叫道：喂.*?'
         },
@@ -4160,6 +4199,31 @@ window.setTimeout(function () {
         }
     };
 
+    var RemoteServerHelper = {
+        async switch2RemoteServer () {
+            await DeathHelper.resolveDeathBookIfAny();
+
+            InterceptorRegistry.register(new Interceptor('跨服结果检测', RemoteServerHelper.remoteFailed, RemoteServerHelper.tryTranditionalRemote, 'notice', 'notify_fail'));
+            System.switchToRemoteServer();
+        },
+
+        switchBack2LocalServer () {
+            System.switchToLocalServer();
+        },
+
+        async tryTranditionalRemote () {
+            await ExecutionManager.wait(1500);
+
+            if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
+
+            await ButtonManager.click('event_1_36344468');
+        },
+
+        remoteFailed (message) {
+            return message.get('msg').includes('请重新登录跨服');
+        }
+    };
+
     var MessageLogger = {
         isMessageInLoggingRejectedList (messagePack) {
             if (!System.getDebugMessageBlacklist()) return false;
@@ -4207,11 +4271,6 @@ window.setTimeout(function () {
 
         async wait (timeout) {
             return new Promise((resolve, reject) => { setTimeout(function () { resolve(); }, timeout); });
-        },
-
-        delay (timeout) {
-            let start = new Date().getTime();
-            while (new Date().getTime() - start < timeout) { };
         }
     };
 
@@ -5015,13 +5074,23 @@ window.setTimeout(function () {
         },
 
         async tryOneoffEscape () {
+            if (ButtonManager.isButtonPressed('id-escape')) {
+                debugging('持续逃跑按钮已经按下，不重复执行...');
+                return;
+            }
+
+            debugging('检查是否需要逃跑...');            
             if (CombatStatus.inProgress()) {
-                let retry = new Retry();
+                debugging('开始尝试逃跑...');
+
+                let retry = new Retry(300);
                 retry.initialize(function escape () {
                     ButtonManager.click('escape');
                 }, CombatStatus.justFinished);
 
                 await retry.fire();
+
+                debugging('逃跑结束。');                
             }
         }
     };
@@ -5188,24 +5257,24 @@ window.setTimeout(function () {
         return result;
     };
 
-    JobManager.register('id-combat-helper', 200, CombatHelper.check);
+    JobRegistry.register('id-combat-helper', 200, CombatHelper.check);
 
-    JobManager.register('id-fishing', 7000, FishingManager.fire);
-    JobManager.register('id-killer', 200, KillerHelper.fire);
-    JobManager.register('id-credits-tickets-stateless', 1000 * 60 * 60 * 2, CreditTicketManager.fire);
-    JobManager.register('id-works-stateless', 1000 * 60 * 60 * 1, DailyWorksManager.fire);
-    JobManager.register('id-idle-checker', 1000 * 60 * 5, IdleChecker.fire);
-    JobManager.register('id-leftover-tasks', 1000 * 60, LeftoverChecker.fire);
+    JobRegistry.register('id-fishing', 7000, FishingManager.fire);
+    JobRegistry.register('id-killer', 200, KillerHelper.fire);
+    JobRegistry.register('id-credits-tickets-stateless', 1000 * 60 * 60 * 2, CreditTicketManager.fire);
+    JobRegistry.register('id-works-stateless', 1000 * 60 * 60 * 1, DailyWorksManager.fire);
+    JobRegistry.register('id-idle-checker', 1000 * 60 * 5, IdleChecker.fire);
+    JobRegistry.register('id-leftover-tasks', 1000 * 60, LeftoverChecker.fire);
 
-    JobManager.register('id-escape', 200, EscapeHelper.escape);
-    JobManager.register('id-repeater-stateless', 200, Repeater.fire);
+    JobRegistry.register('id-escape', 200, EscapeHelper.escape);
+    JobRegistry.register('id-repeater-stateless', 200, Repeater.fire);
 
     var helperConfigurations = [{
         subject: '其他项目',
 
         buttons: [{
             label: '积分礼券',
-            title: '每 ' + JobManager.getJob('id-credits-tickets-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次李火狮消费积分，谜题卡，狗年礼券\n\n注意：周一凌晨多领一次礼物功能已经挪到 "自动点完任务" 功能。',
+            title: '每 ' + JobRegistry.getJob('id-credits-tickets-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次李火狮消费积分，谜题卡，狗年礼券\n\n注意：周一凌晨多领一次礼物功能已经挪到 "自动点完任务" 功能。',
             id: 'id-credits-tickets-stateless',
 
             eventOnClick () {
@@ -5214,14 +5283,14 @@ window.setTimeout(function () {
                         CreditTicketManager.fire();
                     }
 
-                    JobManager.getJob(this.id).start();
+                    JobRegistry.getJob(this.id).start();
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                 }
             }
         }, {
             label: '磕头端茶',
-            title: '每 ' + JobManager.getJob('id-works-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次端茶倒水擂台等工作。',
+            title: '每 ' + JobRegistry.getJob('id-works-stateless').getInterval() / (1000 * 60 * 60) + ' 小时检查一次端茶倒水擂台等工作。',
             id: 'id-works-stateless',
 
             async eventOnClick () {
@@ -5230,9 +5299,9 @@ window.setTimeout(function () {
                         await DailyWorksManager.fire();
                     }
 
-                    JobManager.getJob(this.id).start();
+                    JobRegistry.getJob(this.id).start();
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                 }
             }
         }, {
@@ -5251,15 +5320,15 @@ window.setTimeout(function () {
             }
         }, {
             label: '发呆检测',
-            title: '在同一个地方发呆超过 ' + JobManager.getJob('id-idle-checker').getInterval() / (1000 * 60) + ' 分钟自动回家...',
+            title: '在同一个地方发呆超过 ' + JobRegistry.getJob('id-idle-checker').getInterval() / (1000 * 60) + ' 分钟自动回家...',
             id: 'id-idle-checker',
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     await IdleChecker.initialize();
-                    JobManager.getJob(this.id).start();
+                    JobRegistry.getJob(this.id).start();
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                 }
             }
         }, {
@@ -5269,7 +5338,7 @@ window.setTimeout(function () {
             id: 'id-leftover-tasks',
 
             eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+                ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
             }
         }, {
             label: '自动打坐',
@@ -5293,6 +5362,31 @@ window.setTimeout(function () {
                     MonitorCenter.Sleep.turnOn();
                 } else {
                     MonitorCenter.Sleep.turnOff();
+                }
+            }
+        }, {
+        }, {
+            label: '抢交碎片',
+            title: '此开关打开时，开地图事件会第一时间触发提交已经有的碎片。',
+            id: 'id-deliever-map-fragments',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.MapFragments.turnOn();
+                } else {
+                    MonitorCenter.MapFragments.turnOff();
+                }
+            }
+        }, {
+            label: '杀气保护',
+            title: '此开关打开时，因为杀气高主动叫杀时会自动逃跑至成功。\n\n其他方式发起战斗并不受影响。',
+            id: 'id-murder-preventer',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.MurderPreventer.turnOn();
+                } else {
+                    MonitorCenter.MurderPreventer.turnOff();
                 }
             }
         }, {
@@ -5336,7 +5430,7 @@ window.setTimeout(function () {
             hidden: true,
 
             eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+                ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
             }
         }]
     }, {
@@ -5474,12 +5568,12 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     if (Repeater.confirmAction()) {
-                        JobManager.getJob(this.id).start();
+                        JobRegistry.getJob(this.id).start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                 }
             }
         }, {
@@ -5492,12 +5586,12 @@ window.setTimeout(function () {
                     let name = window.prompt('请输入要杀的目标名字。');
                     if (name) {
                         KillerHelper.setTarget(name);
-                        JobManager.getJob(this.id).start();
+                        JobRegistry.getJob(this.id).start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
                     }
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                 }
             }
         }, {
@@ -5567,7 +5661,7 @@ window.setTimeout(function () {
             hidden: true,
 
             eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+                ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
             }
         }]
     }, {
@@ -5624,16 +5718,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    await DeathHelper.resolveDeathBookIfAny();
-
-                    System.switchToRemoteServer();
-
-                    await ExecutionManager.wait(1000);
-                    $('#id-equipment-for-combat').click();
-
-                    await ExecutionManager.wait(2000);
-                    ButtonManager.pressDown('id-recover-hp-mp');
+                    RemoteServerHelper.switch2RemoteServer();
                 } else {
+                    RemoteServerHelper.switchBack2LocalServer();
                     System.switchToLocalServer();
                 }
             }
@@ -6403,9 +6490,9 @@ window.setTimeout(function () {
                         }
                     }
 
-                    if (decision) JobManager.getJob(this.id).start();
+                    if (decision) JobRegistry.getJob(this.id).start();
                 } else {
-                    JobManager.getJob(this.id).stop();
+                    JobRegistry.getJob(this.id).stop();
                     ButtonManager.resetButtonById(this.id);
                 }
             }
@@ -6837,7 +6924,7 @@ window.setTimeout(function () {
                 let toggleLabel = new ButtonLabel('x ' + defaultText, '', 'red');
 
                 if (ButtonManager.toggleButtonEvent(this, defaultLabel, toggleLabel)) {
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').start();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').start();
 
                     CombatHelper.enableAutoPerforming();
 
@@ -6845,7 +6932,7 @@ window.setTimeout(function () {
                 } else {
                     CombatHelper.disableAutoPerforming();
 
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').stop();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').stop();
                 }
             }
         }, {
@@ -6886,13 +6973,13 @@ window.setTimeout(function () {
                 let toggleLabel = new ButtonLabel('x ' + RecoveryHelper.getSkill().substr(0, 2), '', 'red');
 
                 if (ButtonManager.toggleButtonEvent(this, defaultLabel, toggleLabel)) {
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').start();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').start();
 
                     CombatHelper.enableAutoRecovery();
                 } else {
                     CombatHelper.disableAutoRecovery();
 
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').stop();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').stop();
                 }
             }
         }, {
@@ -6922,13 +7009,13 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').start();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').start();
 
                     CombatHelper.enableDefenceMode();
                 } else {
                     CombatHelper.disableDefenceMode();
 
-                    if (!CombatHelper.isInUsed()) JobManager.getJob('id-combat-helper').stop();
+                    if (!CombatHelper.isInUsed()) JobRegistry.getJob('id-combat-helper').stop();
                 }
             }
         }, {
@@ -6948,12 +7035,12 @@ window.setTimeout(function () {
             }
         }, {
             label: '逃',
-            title: '点击此按钮可以连续自动发出逃跑命令，直到逃跑成功...\n\n注意：此按钮平时如果按下，也可以防止杀气过高误叫杀。',
+            title: '点击此按钮可以连续自动发出逃跑命令，直到逃跑成功...\n\n注意：防杀气过高建议用另外的专门的杀气保护按钮。',
             id: 'id-escape',
             width: '38px',
 
             eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobManager.getJob(this.id).start() : JobManager.getJob(this.id).stop();
+                ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
             }
         }, {
             label: '取消加力',
@@ -7678,7 +7765,7 @@ window.setTimeout(function () {
 
         MessageLogger.log(message);
 
-        InterceptorRegistry.getInterceptors(message.get('type'), message.get('subtype')).forEach(v => v.handle(message));
+        InterceptorRegistry.getInterceptors(message.get('type'), message.get('subtype')).some(v => v.handle(message));
     };
 
     System.resetTitle();
