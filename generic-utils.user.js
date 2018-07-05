@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.93
+// @version      2.1.94
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -846,8 +846,12 @@ window.setTimeout(function () {
                 return Objects.Room.getEventByName('参习岩画') || FrescoHelper._stop;
             });
 
+            ButtonManager.pressDown('id-escape');
+
             await retry.fire();
             await Navigation.move('~参习岩画;home');
+
+            ButtonManager.resetButtonById('id-escape');
         },
 
         stopTrying () {
