@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.94
+// @version      2.1.95
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -134,17 +134,13 @@ window.setTimeout(function () {
     var System = {
         globalObjectMap: window.unsafeWindow.g_obj_map,
         debugMode: false,
-        loadingScriptInProgress: false,
+        loadingScriptInProgress: true,
 
         _uid: '',
         _automatedReconnect: false,
 
-        replaceControlCharBlank (valueWithColor) {
-            return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
-        },
-
-        _initializeUid () {
-            if (!System._uid) System._uid = User.getId();
+        ansiToText (valueWithColor) {
+            return window.unsafeWindow.ansi_up.ansi_to_text(valueWithColor);
         },
 
         resetTitle () {
@@ -152,17 +148,11 @@ window.setTimeout(function () {
         },
 
         setVariant (key, value) {
-            System._initializeUid();
-            let keyWithEnvInfo = System.isLocalServer() ? key : `${key}.remote`;
-
-            window.GM_setValue(`${System._uid}.${keyWithEnvInfo}`, value);
+            window.GM_setValue(`${User.getId()}.${key}`, value);
         },
 
         getVariant (key, defaultValue) {
-            System._initializeUid();
-            let keyWithEnvInfo = System.isLocalServer() ? key : `${key}.remote`;
-
-            let currentValue = window.GM_getValue(`${System._uid}.${keyWithEnvInfo}`);
+            let currentValue = window.GM_getValue(`${User.getId()}.${key}`);
             if (!currentValue && (defaultValue || defaultValue === 0)) {
                 System.setVariant(key, defaultValue);
 
@@ -242,7 +232,8 @@ window.setTimeout(function () {
             PATH_CUSTOMIZED: 'customizations.user.path',
             EQUIPMENT_COMBAT: 'equipment.combat',
             EQUIPMENT_STUDY: 'equipment.study',
-            GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas'
+            GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas',
+            FUGITIVE_NAMES: 'fugitive.names'
         },
 
         logCurrentSettings () {
@@ -285,7 +276,7 @@ window.setTimeout(function () {
             let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
             log('读取上次激活的按钮...', ids);
 
-            System.loadingScriptInProgress = false;
+            System.loadingScriptInProgress = true;
 
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
@@ -296,11 +287,11 @@ window.setTimeout(function () {
                 }
             }
 
-            System.loadingScriptInProgress = true;
+            System.loadingScriptInProgress = false;
         },
 
         saveCurrentButtonStatus () {
-            if (!System.loadingScriptInProgress) return;
+            if (System.loadingScriptInProgress) return;
             if (!System.isLocalServer()) return;
 
             let ids = [];
@@ -390,21 +381,21 @@ window.setTimeout(function () {
                     if (!v['key'].includes('skill')) return false;
                     let info = Array.isArray(v['value']) ? v['value'] : v['value'].split(',');
                     return info[info.length - 3] === '1' && (!type || info[info.length - 4] === type);
-                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+                }).map(v => System.ansiToText(v['value'].split(',')[1]));
             },
 
             getSkillsInUpgrading () {
                 return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
                     let values = v['value'].split(',');
                     return values.length > 1 && (values[values.length - 1] === '4');
-                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+                }).map(v => System.ansiToText(v['value'].split(',')[1]));
             },
 
             getSkillsInPractice () {
                 return System.globalObjectMap.get('msg_skills').elements.filter(function (v) {
                     let values = v['value'].split(',');
                     return values.length > 1 && (values[values.length - 1] === '1');
-                }).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+                }).map(v => System.ansiToText(v['value'].split(',')[1]));
             }
         }
     };
@@ -913,12 +904,12 @@ window.setTimeout(function () {
         },
 
         async addressClanTask (message) {
-            await new Task(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await new Task(System.ansiToText(message.get('msg'))).resolve();
             await Navigation.move('clan;scene;clan submit_task');
         },
 
         async addressMasterTask (message) {
-            await new Task(System.replaceControlCharBlank(message.get('msg'))).resolve();
+            await new Task(System.ansiToText(message.get('msg'))).resolve();
             await Navigation.move('go_family');
             let link = await Panels.Family.getActionLink('交任务');
             await ExecutionManager.asyncExecute(link);
@@ -957,7 +948,7 @@ window.setTimeout(function () {
         },
 
         _keywordAppears (message, keyword) {
-            return System.replaceControlCharBlank(message.get('msg')).includes(keyword);
+            return System.ansiToText(message.get('msg')).includes(keyword);
         }
     };
 
@@ -1572,7 +1563,7 @@ window.setTimeout(function () {
                 if (!TeamworkHelper.isTeamworkModeOn()) return false;
                 if (!message.get('msg')) return false;
 
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
 
                 return text.includes('：全体注意，') && (text.includes('杀死') || text.includes('比试'));
             },
@@ -1585,7 +1576,7 @@ window.setTimeout(function () {
             },
 
             askForHelp (message) {
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
                 debugging('判定是否需要团队帮忙...', text);
 
                 if (TeamworkHelper.Combat.isMyBattleEvent(text)) {
@@ -1594,7 +1585,7 @@ window.setTimeout(function () {
             },
 
             fightTogether (message) {
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
                 debugging('判定是否帮忙打...', text);
 
                 if (text.includes('杀死') || text.includes('比试')) {
@@ -1633,7 +1624,7 @@ window.setTimeout(function () {
             async escapeTogether (message) {
                 if (!CombatStatus.inProgress()) return;
 
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
                 let matches = text.match('(.*?)一看势头不对，溜了！');
                 if (matches && TeamworkHelper.Role.isTeamMember(matches[1])) {
                     let escape = new Retry(200);
@@ -1667,7 +1658,7 @@ window.setTimeout(function () {
 
         Constructure: {
             async createTeamIfNeeded () {
-                if (!System.loadingScriptInProgress) return;
+                if (System.loadingScriptInProgress) return;
 
                 if (!System.globalObjectMap.get('msg_team').get('team_id')) {
                     if (!window.confirm('目前没有组队，需要创建一个队伍吗？')) {
@@ -1723,7 +1714,7 @@ window.setTimeout(function () {
             },
 
             newCommandArrives (message) {
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
                 if (!text.includes(TeamworkHelper.Constructure.getTeamLeadName())) return false;
 
                 if (text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。')) return true;
@@ -1734,7 +1725,7 @@ window.setTimeout(function () {
             moveWithTeamLead (message) {
                 debugging('判定团队移动行为...');
 
-                let text = System.replaceControlCharBlank(message.get('msg'));
+                let text = System.ansiToText(message.get('msg'));
                 let matches = null;
                 if (text.includes('走一步')) {
                     matches = text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
@@ -1850,6 +1841,16 @@ window.setTimeout(function () {
         }
     };
 
+    var FugitiveManager = {
+        getNames () {
+            return System.getVariant(System.keys.FUGITIVE_NAMES, '段老大');
+        },
+
+        setNames (names) {
+            System.setVariant(System.keys.FUGITIVE_NAMES, names);
+        }
+    };
+
     var MonitorCenter = {
         MurderPreventer: {
             turnOn () {
@@ -1880,7 +1881,7 @@ window.setTimeout(function () {
             },
 
             mapOpened (message) {
-                return System.replaceControlCharBlank(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图。');
+                return System.ansiToText(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图。');
             },
 
             async deliever (message) {
@@ -1976,6 +1977,37 @@ window.setTimeout(function () {
             retry (message) {
                 log('暂时无法打坐。5 分钟后自动重试...');
                 window.setTimeout(MonitorCenter.Dazuo.continue, 5 * 60 * 1000);
+            }
+        },
+
+        Fugitive: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('跨服逃犯监听', MonitorCenter.Fugitive.newEvents, MonitorCenter.Fugitive.fire, 'channel', 'sys'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('跨服逃犯监听');
+            },
+
+            newEvents (message) {
+                let text = message.get('msg');
+                if (!text) return false;
+
+                debugging('判定是否本服逃犯...');
+                if (System.isLocalServer() && !text.startsWith('[1;31m【系统】')) return false;
+                debugging('判定是否跨服本区逃犯...');
+                if (!text.startsWith(`[1;31m【系统】[${User.getAreaRange()}区]`)) return false;
+
+                debugging('判定是否包含其他关键字...');
+                return text.includes('慌不择路，逃往了');
+            },
+
+            fire (message) {
+                let matches = System.ansiToText(message.get('msg')).match('【系统】(.*?)慌不择路，逃往了(.*?)-href;0;(.*?).*?0');
+                if (matches && (!FugitiveManager.getNames() || FugitiveManager.getNames().split(',').some(v => matches[1].match(v)))) {
+                    debugging(`发现逃犯 ${matches[1]}, 位置 ${matches[2]}`);
+                    ExecutionManager.execute(`clickButton('${matches[3]}', 0) `);
+                }
             }
         }
     };
@@ -2713,37 +2745,6 @@ window.setTimeout(function () {
         }
     };
 
-    var FugitiveManager = {
-        turnOn () {
-            InterceptorRegistry.register(new Interceptor('跨服逃犯监听', FugitiveManager.newEvents, FugitiveManager.fire, 'channel', 'sys'));
-        },
-
-        turnOff () {
-            InterceptorRegistry.unregister('跨服逃犯监听');
-        },
-
-        newEvents (message) {
-            let text = message.get('msg');
-            if (!text) return false;
-
-            debugging('判定是否本服逃犯...');
-            if (System.isLocalServer() && !text.startsWith('[1;31m【系统】')) return false;
-            debugging('判定是否跨服本区逃犯...');
-            if (!text.startsWith(`[1;31m【系统】[${User.getAreaRange()}区]`)) return false;
-
-            debugging('判定是否包含其他关键字...');
-            return text.includes('慌不择路，逃往了');
-        },
-
-        fire (message) {
-            let matches = System.replaceControlCharBlank(message.get('msg')).match('【系统】(.*?)慌不择路，逃往了(.*?)-href;0;(.*?).*?0');
-            if (matches) {
-                debugging(`发现逃犯 ${matches[1]}, 位置 ${matches[2]}`);
-                ExecutionManager.execute(`clickButton('${matches[3]}', 0) `);
-            }
-        }
-    };
-
     var RecoveryHelper = {
         _retry: new Retry(500),
         _stopContinualRecovery: false,
@@ -2965,49 +2966,6 @@ window.setTimeout(function () {
         }
     };
 
-    class Fugitive {
-        constructor (message) {
-            let matches = message.match(/\[36-40区\](段老大|二娘)逃到了跨服时空(.*?)之中/);
-            if (matches) {
-                this._fugitiveName = matches[1];
-                this._place = matches[2];
-            }
-        }
-
-        getFugitiveName () {
-            return this._fugitiveName;
-        }
-
-        getPlace () {
-            return this._place;
-        }
-
-        toString () {
-            return this._fugitiveName + ' (' + this._place + ')';
-        }
-    };
-
-    var FugitiveSearchManager = {
-        _targets: [],
-
-        identifyFugitives () {
-            let messages = Panels.Chatting.filterMessageObjectsByKeyword(/【系统】跨服：\[36-40区\](.*?)逃到了跨服时空(.*?)之中，众位英雄快来诛杀。/);
-
-            if (messages.length) {
-                FugitiveSearchManager._targets = [new Fugitive(messages.last().text()), new Fugitive(messages.last().prev().text())];
-
-                let choice = window.prompt('选择哪个目标？\n\n1. ' + FugitiveSearchManager._targets[0].toString() + '\n2. ' + FugitiveSearchManager._targets[1].toString(), 1);
-                if (choice) {
-                    return FugitiveSearchManager._targets[parseInt(choice) - 1].getPlace();
-                }
-            }
-        },
-
-        async catchTheFugitive (room) {
-            await ButtonManager.click(PathManager.getPathByRoom(room));
-        }
-    };
-
     var BanditSearchManager = {
         Const: {
             REG_BANDIT_APPEARS: '^【系统】(.*?)对着(.*?)叫道：喂.*?'
@@ -3132,7 +3090,7 @@ window.setTimeout(function () {
 
                 return System.globalObjectMap.elements
                     .filter(v => v['key'].includes('skill_button'))
-                    .filter(v => skills.includes(System.replaceControlCharBlank(v['value'].get('name'))))
+                    .filter(v => skills.includes(System.ansiToText(v['value'].get('name'))))
                     .map(v => 'clickButton("playskill ' + v['value'].get('pos') + '", 0)');
             },
 
@@ -3147,7 +3105,7 @@ window.setTimeout(function () {
             },
 
             getAvailableSkills (skills = []) {
-                let allAvailableSkills = System.globalObjectMap.elements.filter(v => v['key'].includes('skill_button')).map(v => System.replaceControlCharBlank(v['value'].get('name')));
+                let allAvailableSkills = System.globalObjectMap.elements.filter(v => v['key'].includes('skill_button')).map(v => System.ansiToText(v['value'].get('name')));
                 if (skills.length > 0) {
                     return allAvailableSkills.filter(v => skills.includes(v));
                 } else {
@@ -3273,7 +3231,7 @@ window.setTimeout(function () {
             getItems (type = 'items') {
                 return System.globalObjectMap.get('msg_items').elements.filter(v => v['key'].includes(type)).map(function (v) {
                     let values = v['value'].split(',');
-                    let item = new Item(System.replaceControlCharBlank(values[1]), values[0], parseInt(values[2]));
+                    let item = new Item(System.ansiToText(values[1]), values[0], parseInt(values[2]));
                     return item;
                 });
             },
@@ -3283,7 +3241,7 @@ window.setTimeout(function () {
             },
 
             getItemQuantityByName (name = '') {
-                let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.replaceControlCharBlank(v['value']).includes(`,${name},`));
+                let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.ansiToText(v['value']).includes(`,${name},`));
                 if (records.length === 0) return 0;
 
                 return parseInt(records[0]['value'].split(',')[2]);
@@ -3350,21 +3308,21 @@ window.setTimeout(function () {
                     if (!v['key'].includes('npc')) return false;
 
                     let values = v['value'].split(',');
-                    if (name && name !== System.replaceControlCharBlank(values[1])) return false;
+                    if (name && name !== System.ansiToText(values[1])) return false;
                     if (fighting && values[2] !== '1') return false;
 
                     return true;
                 }).map(function (v) {
                     let values = v['value'].split(',');
-                    let npc = new Npc(System.replaceControlCharBlank(values[1]), values[0]);
+                    let npc = new Npc(System.ansiToText(values[1]), values[0]);
                     debugging('发现 ' + npc.toString());
                     return npc;
                 });
             },
 
             getNpcsByMessage (message, name) {
-                return message.elements.filter(v => v['key'].includes('npc') && (!name || System.replaceControlCharBlank(v['value']).includes(`,${name},`))).map(function (v) {
-                    let values = System.replaceControlCharBlank(v['value']).split(',');
+                return message.elements.filter(v => v['key'].includes('npc') && (!name || System.ansiToText(v['value']).includes(`,${name},`))).map(function (v) {
+                    let values = System.ansiToText(v['value']).split(',');
                     return new Npc(values[1], values[0]);
                 });
             },
@@ -3403,7 +3361,7 @@ window.setTimeout(function () {
             },
 
             getPlayers () {
-                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('user')).map(v => System.replaceControlCharBlank(v['value'].split(',')[1]));
+                return System.globalObjectMap.get('msg_room').elements.filter(v => v['key'].includes('user')).map(v => System.ansiToText(v['value'].split(',')[1]));
             },
 
             isSecurePlace () {
@@ -3436,7 +3394,7 @@ window.setTimeout(function () {
 
             getNpcIdsByName (name) {
                 let npcIds = System.globalObjectMap.get('msg_room').elements.filter(function (v) {
-                    return v['key'].includes('npc') && name === System.replaceControlCharBlank(v['value'].split(',')[1]);
+                    return v['key'].includes('npc') && name === System.ansiToText(v['value'].split(',')[1]);
                 }).map(function (v) {
                     return v['value'].split(',')[0];
                 });
@@ -3973,7 +3931,7 @@ window.setTimeout(function () {
         getToDragonPlace (message) {
             debugging('检测是否到达战场...', message);
 
-            if (System.replaceControlCharBlank(message.get('short')) === DragonMonitor._dragon.getRoom()) {
+            if (System.ansiToText(message.get('short')) === DragonMonitor._dragon.getRoom()) {
                 debugging('到达战场', message);
 
                 return true;
@@ -4117,7 +4075,7 @@ window.setTimeout(function () {
         identifyDragonEvent (text) {
             debugging('解析青龙信息。。。');
 
-            let event = System.replaceControlCharBlank(text);
+            let event = System.ansiToText(text);
             debugging('过滤颜色字符: ' + event);
 
             return event.match(DragonMonitor._REG_DRAGON_APPERS);
@@ -4241,10 +4199,10 @@ window.setTimeout(function () {
             });
         },
 
-        log (messagePack) {
-            if (MessageLogger.isMessageInLoggingRejectedList(messagePack)) return;
+        log (message) {
+            if (MessageLogger.isMessageInLoggingRejectedList(message)) return;
 
-            debugging(`${messagePack.get('type')} | ${messagePack.get('subtype')} | ${messagePack.get('msg')}`, messagePack.elements);
+            debugging(`${message.get('type')} | ${message.get('subtype')} | ${message.get('msg')}`, message.elements);
         }
     };
 
@@ -5339,6 +5297,7 @@ window.setTimeout(function () {
             label: '自动点完',
             title: '凌晨 5:55 把如下 VIP 点点点完\n\n1. 正邪\n2. 逃犯\n3. 打榜\n4. 师门任务\n5. 帮派任务\n6. 谜题\n7. 闯楼奖励\n8. 李火狮礼券积分谜题卡\n9. 每日一次任务\n10. 排行榜奖励\n\n注意：周日挂着可以在周一凌晨多领一次新礼包。',
             id: 'id-leftover-tasks',
+            stateful: true,
 
             eventOnClick () {
                 ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
@@ -5347,7 +5306,8 @@ window.setTimeout(function () {
             label: '自动打坐',
             title: '此开关打开时，打坐结束事件会自动触发继续打坐。',
             id: 'id-continue-dazuo',
-
+            stateful: true,
+            
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     MonitorCenter.Dazuo.turnOn();
@@ -5359,7 +5319,8 @@ window.setTimeout(function () {
             label: '自动睡床',
             title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：\n1. 睡床结束时角色在师门的话会自动触发继续睡床。\n2. 如果因为不在师门触发不了睡床，脚本会每隔 5 分钟重试一次直到成功。\n3. 暂不支持自动飞回师门睡床，避免一些诸如森林中自动飞出的尴尬。',
             id: 'id-continue-sleep',
-
+            stateful: true,
+            
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     MonitorCenter.Sleep.turnOn();
@@ -5512,18 +5473,6 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按顺序输入学习模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_STUDY, EquipmentHelper.studyItemsByDefault));
                 if (answer) {
                     EquipmentHelper.setItemsForCombat(answer);
-                }
-            }
-        }, {
-            label: '逃犯',
-            title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 只抓取段老大和二娘的信息',
-            id: 'id-fugitive-monitor',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    FugitiveManager.turnOn();
-                } else {
-                    FugitiveManager.turnOff();
                 }
             }
         }, {
@@ -5724,7 +5673,6 @@ window.setTimeout(function () {
                     RemoteServerHelper.switch2RemoteServer();
                 } else {
                     RemoteServerHelper.switchBack2LocalServer();
-                    System.switchToLocalServer();
                 }
             }
         }, {
@@ -5842,17 +5790,6 @@ window.setTimeout(function () {
                 let npc = await BanditSearchManager.identifyBandits();
                 if (npc !== null) {
                     Navigation.goto(npc);
-                }
-            }
-        }, {
-            label: '跨服逃犯',
-            title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 只抓取段老大和二娘的信息',
-
-            async eventOnClick () {
-                await ButtonManager.click('go_chat');
-                let place = FugitiveSearchManager.identifyFugitives();
-                if (place !== null) {
-                    await FugitiveSearchManager.catchTheFugitive(place);
                 }
             }
         }, {
@@ -6139,6 +6076,32 @@ window.setTimeout(function () {
                 let answer = window.prompt('请按格式 (比如 轩辕剑碎片|镯|斩龙宝戒) 填入不打的青龙关键字。', DragonMonitor.getRegKeywords4ExcludedTargets());
                 if (answer || answer === '') {
                     DragonMonitor.setRegKeywords4ExcludedTargets(answer);
+                }
+            }
+        }, {
+        }, {
+            label: '逃犯',
+            title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 指定逃犯相关的事件',
+            id: 'id-fugitive-monitor',
+            width: '60px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Fugitive.turnOn();
+                } else {
+                    MonitorCenter.Fugitive.turnOff();
+                }
+            }
+        }, {
+            label: '.',
+            title: '指定逃犯...',
+            width: '10px',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入逃犯名字列表...\n\n注意：\n1. 关键字即可，比如老大\n2. 多个名字之间以半角逗号隔开\n3. 不设置则代表不挑都打', FugitiveManager.getNames());
+                if (answer || answer === '') {
+                    FugitiveManager.setNames(answer);
                 }
             }
         }]
@@ -7747,7 +7710,8 @@ window.setTimeout(function () {
     function initializeGenericInterceptors () {
         InterceptorRegistry.register(new Interceptor('跨服切换检测', function worldChangeDetected (message) {
             return true;
-        }, function reloadButtonStatus (message) {
+        }, async function reloadButtonStatus (message) {
+            await ExecutionManager.wait(2000);
             System.refreshButtonStatus();
             System.resetTitle();
         }, 'g_login', 'status'));
