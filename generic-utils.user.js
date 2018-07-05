@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.95
+// @version      2.1.96
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -148,11 +148,14 @@ window.setTimeout(function () {
         },
 
         setVariant (key, value) {
+            debugging(`setting key ${User.getId()}.${key} with value of ${value}`);
             window.GM_setValue(`${User.getId()}.${key}`, value);
         },
 
         getVariant (key, defaultValue) {
             let currentValue = window.GM_getValue(`${User.getId()}.${key}`);
+            debugging(`getting value for ${User.getId()}.${key}: ${currentValue}`);
+
             if (!currentValue && (defaultValue || defaultValue === 0)) {
                 System.setVariant(key, defaultValue);
 
@@ -272,11 +275,11 @@ window.setTimeout(function () {
             }
         },
 
-        refreshButtonStatus () {
+        reloadPreviousButtonStatus () {
+            System.loadingScriptInProgress = true;
+
             let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
             log('读取上次激活的按钮...', ids);
-
-            System.loadingScriptInProgress = true;
 
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
@@ -292,7 +295,6 @@ window.setTimeout(function () {
 
         saveCurrentButtonStatus () {
             if (System.loadingScriptInProgress) return;
-            if (!System.isLocalServer()) return;
 
             let ids = [];
             $('button').filter(function () {
@@ -1866,7 +1868,7 @@ window.setTimeout(function () {
             },
 
             mapOpened (message) {
-                return System.ansiToText(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图。');
+                return System.ansiToText(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图');
             },
 
             async deliever (message) {
@@ -3768,39 +3770,37 @@ window.setTimeout(function () {
         },
 
         simpleToggleButtonEvent (button, toggleLabel = '') {
+            let isPressEvent = false;
+            
             if (button.innerText !== button.name) {
-                debugging('revert from simple toggle mode');
                 button.innerText = button.name;
                 button.style.color = '';
-
-                System.saveCurrentButtonStatus();
-                return false;
             } else {
-                debugging('switching to simple toggle mode');
+                isPressEvent = true;
                 button.innerText = toggleLabel || 'x ' + button.name;
                 button.style.color = 'red';
-
-                System.saveCurrentButtonStatus();
-                return true;
             }
+
+            System.saveCurrentButtonStatus();
+            return isPressEvent;
         },
 
         toggleButtonEvent (button, defaultLabel, toggleLabel) {
+            let isPressEvent = false;
+
             if (button.innerText === defaultLabel.getText()) {
                 debugging('switching to toggle mode');
+                isPressEvent = true;
                 button.innerText = toggleLabel.getText();
                 button.style.color = toggleLabel.getColor();
-
-                System.saveCurrentButtonStatus();
-                return true;
             } else {
                 debugging('revert from toggle mode');
                 button.innerText = defaultLabel.getText();
                 button.style.color = defaultLabel.getColor();
-
-                System.saveCurrentButtonStatus();
-                return false;
             }
+            
+            System.saveCurrentButtonStatus();
+            return isPressEvent;
         },
 
         resetButtonById (buttonId) {
@@ -3832,8 +3832,16 @@ window.setTimeout(function () {
             return texts;
         },
 
-        resetAllButtons () {
+        clearAllButtonStatus () {
+            System.loadingScriptInProgress = true;
 
+            $('button').filter(function () {
+                return $(this).attr('id') && $(this).attr('id').startsWith('id-') && !$(this).attr('id').includes('-stateless');
+            }).each(function () {
+                ButtonManager.resetButtonById($(this).attr('id'));
+            });
+        
+            System.loadingScriptInProgress = false;
         }
     };
 
@@ -4135,6 +4143,9 @@ window.setTimeout(function () {
 
             InterceptorRegistry.register(new Interceptor('跨服结果检测', RemoteServerHelper.remoteFailed, RemoteServerHelper.tryTranditionalRemote, 'notice', 'notify_fail'));
             System.switchToRemoteServer();
+
+            await ExecutionManager.wait(10000);
+            InterceptorRegistry.unregister('跨服结果检测');
         },
 
         switchBack2LocalServer () {
@@ -5577,16 +5588,6 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 log('当前监听', InterceptorRegistry.getInterceptors());
-            }
-        }, {
-        }, {
-            label: '检测状态',
-            title: '自动检测状态...',
-            id: 'id-auto-status-reset',
-            hidden: true,
-
-            eventOnClick () {
-                ButtonManager.resetAllButtons();
             }
         }, {
         }, {
@@ -7687,7 +7688,7 @@ window.setTimeout(function () {
         ButtonManager.pressDown('id-continue-dazuo');
         $('#测试中功能').click();
 
-        System.refreshButtonStatus();
+        System.reloadPreviousButtonStatus();
     }
 
     function initializeGenericInterceptors () {
@@ -7695,7 +7696,9 @@ window.setTimeout(function () {
             return true;
         }, async function reloadButtonStatus (message) {
             await ExecutionManager.wait(2000);
-            System.refreshButtonStatus();
+
+            ButtonManager.clearAllButtonStatus();
+            System.reloadPreviousButtonStatus();
             System.resetTitle();
         }, 'g_login', 'status'));
 
