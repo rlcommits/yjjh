@@ -1795,21 +1795,6 @@ window.setTimeout(function () {
         }
     };
 
-    class Skill {
-        constructor (name, id) {
-            this._name = name;
-            this._id = id;
-        }
-
-        getId () {
-            return this._id;
-        }
-
-        getName () {
-            return this._name;
-        }
-    };
-
     var SkillHelper = {
         getSkillByName (name) {
             let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
@@ -2499,22 +2484,6 @@ window.setTimeout(function () {
 
             await ButtonManager.click('quit_chat');
             return info;
-        }
-    };
-
-    var EmeiHelper = {
-        async passGate () {
-            let combat = new Combat();
-            combat.initialize(new Npc('看山弟子'), '比试');
-            await combat.fire();
-
-            await Navigation.move('n');
-
-            let retry = new Retry();
-            retry.initialize(async function escape () {
-                await ButtonManager.click('escape');
-            }, CombatStatus.justFinished);
-            await retry.fire();
         }
     };
 
@@ -4414,6 +4383,20 @@ window.setTimeout(function () {
             }
         },
 
+        async passEmeiGate () {
+            let combat = new Combat();
+            combat.initialize(new Npc('看山弟子'), '比试');
+            await combat.fire();
+
+            await Navigation.move('n');
+
+            let retry = new Retry();
+            retry.initialize(async function escape () {
+                await ButtonManager.click('escape');
+            }, CombatStatus.justFinished);
+            await retry.fire();
+        },
+
         _PATHS: {
             TRAVERSAL: {
                 '雪亭镇': 'jh 1;inn_op1;n;s;w;e;e;w;s;e;s;w;w;e;s;n;e;e;ne;ne;sw;sw;n;w;n;w;e;e;e;n;s;e;e;n;s;s;n;e;w;w;w;w;w;n;w;e;n;w;e;e;e;w;w;n;w;e;e;w;n',
@@ -4863,7 +4846,7 @@ window.setTimeout(function () {
                 '草原': 'jh 26;w',
                 '无名山峡谷': 'jh 29;#4 n',
                 '无名峡谷': 'jh 29;#4 n;event_1_60035830;event_1_65661209',
-                '九老洞': 'jh 8;w;nw;#4 n;e;e;n;n;e;@EmeiHelper.passGate();#3 n;w;#9 n;nw;sw;w;nw;w',
+                '九老洞': 'jh 8;w;nw;#4 n;e;e;n;n;e;@PathManager.passEmeiGate();#3 n;w;#9 n;nw;sw;w;nw;w',
 
                 '饮风客栈': 'jh 1',
                 '龙门石窟': 'jh 2',
@@ -5307,7 +5290,7 @@ window.setTimeout(function () {
             title: '此开关打开时，打坐结束事件会自动触发继续打坐。',
             id: 'id-continue-dazuo',
             stateful: true,
-            
+
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     MonitorCenter.Dazuo.turnOn();
@@ -5320,7 +5303,7 @@ window.setTimeout(function () {
             title: '点下时睡床结束事件会自动触发继续睡床。\n\n注意：\n1. 睡床结束时角色在师门的话会自动触发继续睡床。\n2. 如果因为不在师门触发不了睡床，脚本会每隔 5 分钟重试一次直到成功。\n3. 暂不支持自动飞回师门睡床，避免一些诸如森林中自动飞出的尴尬。',
             id: 'id-continue-sleep',
             stateful: true,
-            
+
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     MonitorCenter.Sleep.turnOn();
