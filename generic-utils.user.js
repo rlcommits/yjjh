@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.97
+// @version      2.1.98
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -148,14 +148,11 @@ window.setTimeout(function () {
         },
 
         setVariant (key, value) {
-            debugging(`setting key ${User.getId()}.${key} with value of ${value}`);
             window.GM_setValue(`${User.getId()}.${key}`, value);
         },
 
         getVariant (key, defaultValue) {
             let currentValue = window.GM_getValue(`${User.getId()}.${key}`);
-            debugging(`getting value for ${User.getId()}.${key}: ${currentValue}`);
-
             if ((!currentValue && currentValue !== '' && currentValue !== 0) && (defaultValue || defaultValue === 0)) {
                 System.setVariant(key, defaultValue);
 
@@ -3771,7 +3768,7 @@ window.setTimeout(function () {
 
         simpleToggleButtonEvent (button, toggleLabel = '') {
             let isPressEvent = false;
-            
+
             if (button.innerText !== button.name) {
                 button.innerText = button.name;
                 button.style.color = '';
@@ -3798,7 +3795,7 @@ window.setTimeout(function () {
                 button.innerText = defaultLabel.getText();
                 button.style.color = defaultLabel.getColor();
             }
-            
+
             System.saveCurrentButtonStatus();
             return isPressEvent;
         },
@@ -3840,7 +3837,7 @@ window.setTimeout(function () {
             }).each(function () {
                 ButtonManager.resetButtonById($(this).attr('id'));
             });
-        
+
             System.loadingScriptInProgress = false;
         }
     };
