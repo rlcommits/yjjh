@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.102
+// @version      2.1.103
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2018,7 +2018,6 @@ window.setTimeout(function () {
 
             async function detectKeyKnight () {
                 let knights = await KnightManager.prioritize();
-                debugging('detectKeyKnight...');
                 return knights.filter(v => parseInt(v.getProgress()) < 25000).sort((a, b) => b.getProgress() - a.getProgress())[0].getName();
             }
         },
@@ -2044,11 +2043,18 @@ window.setTimeout(function () {
             await Objects.Npc.action(new Npc(name), action);
         },
 
-        async please (name) {
+        async improveFriendship (name) {
             await ButtonManager.click('score');
             await ButtonManager.click('prev;enforce 0');
 
             await KnightManager.capture(name);
+            if (await Objects.Npc.hasAction(new Npc(name), '观战')) {
+                await Objects.Npc.action(new Npc(name), '观战');
+                await ExecutionManager.wait(1500);
+                if (!window.confirm(`当前${name}正在与人战斗且战场状况如下，确定继续发起战斗？\n\n${System.ansiToText(Panels.Combat.getCombatInfo())}`)) {
+                    return;
+                }
+            }
 
             await fight(name, '比试', KnightManager._puppetSkills, new CustomizedEvent(this.puppetExists, this.escape));
 
@@ -3112,7 +3118,7 @@ window.setTimeout(function () {
                     }
                     i === 1 && result.push(' vs. ');
                 }
-                return result.join('/');
+                return result.join(' ').replace(/[ ]{2,3}/g, ' ');
             }
         },
 
@@ -3376,6 +3382,11 @@ window.setTimeout(function () {
         },
 
         Npc: {
+            async hasAction (npc, action) {
+                await ButtonManager.click(`look_npc ${npc.getId()}`);
+                return Objects.Npc.getActionLink(action);
+            },
+
             getActionLink (action) {
                 return $('.cmd_click2').filter(function () { return $(this).text() === action; }).attr('onclick');
             },
@@ -3395,7 +3406,7 @@ window.setTimeout(function () {
                         ButtonManager.click('kill ' + npc.getId());
                         break;
                     case '观战':
-                        ButtonManager.click('watch_vs ' + npc.getId());
+                        await ButtonManager.click('watch_vs ' + npc.getId());
                         break;
                     case '销毁生死簿（银两）':
                         await ExecutionManager.asyncExecute(Objects.Room.getNpcDomById(npc.getId()).attr('onclick'), 1000);
@@ -6711,7 +6722,7 @@ window.setTimeout(function () {
                     return;
                 }
 
-                await KnightManager.please(System.getVariant(System.keys.KEY_KNIGHT_NAME));
+                await KnightManager.improveFriendship(System.getVariant(System.keys.KEY_KNIGHT_NAME));
             }
         }, {
             label: '.',
