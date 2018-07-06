@@ -5657,15 +5657,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '云远寺',
-            title: '一键走到地图碎片所在地室...',
-
-            eventOnClick () {
-                if (window.confirm('确定去西安云远寺地室？')) {
-                    Navigation.move(PathManager.getPathForSpecificEvent('云远寺地室'));
-                }
-            }
-        }, {
             label: '九老洞',
             title: '一键到九老洞',
             id: 'id-goto-night-old-cave',
