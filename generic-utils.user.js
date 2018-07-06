@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.100
+// @version      2.1.101
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -140,13 +140,11 @@ window.setTimeout(function () {
         _automatedReconnect: false,
 
         ansiToText (valueWithColor) {
-            if (!valueWithColor) return '';
-            
-            return window.unsafeWindow.ansi_up.ansi_to_text(valueWithColor);
+            return valueWithColor ? window.unsafeWindow.ansi_up.ansi_to_text(valueWithColor) : '';
         },
 
         replaceControlCharBlank (valueWithColor) {
-            return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
+            return valueWithColor ? window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor) : '';
         },
 
         resetTitle () {
@@ -1478,7 +1476,7 @@ window.setTimeout(function () {
         }
 
         getCode () {
-            return this._code;
+            return this._code ? this._code : this._description;
         }
     };
 
@@ -1736,7 +1734,7 @@ window.setTimeout(function () {
                     matches = text.match('^href;0;team【队伍】(.*?)：全体注意，往(.*?)走一步。');
                     Navigation.move(new Direction(matches[2]).getCode());
                 } else if (text.includes('出发前往')) {
-                    matches = text.match('^href;0;team【队伍】(.*?)：全体注意，出发前往(.*?)。');
+                    matches = text.match('.*?【队伍】(.*?)：全体注意，出发前往(.*?)。');
                     TeamworkHelper.teamChat(`收到去${matches[2]}的指令，马上出发。`);
                     if (PathManager.getPathForSpecificEvent(matches[2])) {
                         Navigation.move(PathManager.getPathForSpecificEvent(matches[2]));
@@ -3566,7 +3564,12 @@ window.setTimeout(function () {
                         GenericMapCleaner._stop = true;
                     } else {
                         debugging('移动到下一个房间...');
-                        await Navigation.move(GenericMapCleaner._path.shift());
+                        let direction = GenericMapCleaner._path.shift();
+                        await Navigation.move(direction);
+
+                        if (TeamworkHelper.Role.isTeamLead(User.getName())) {
+                            TeamworkHelper.Navigation.notifyTeamForMove(direction);
+                        }
                     }
                 } else {
                     await Navigation.move(Objects.Room.getDirectionByRandom());
@@ -4920,7 +4923,8 @@ window.setTimeout(function () {
                 '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
 
                 '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1500;~幽荧殿;#4 s;#3 w',
-                '极武坛前': 'fb 1;#wait 1000;w;s;e'
+                '极武坛前': 'fb 1;#wait 1000;w;s;e',
+                '极武坛扫荡': '#4 e;nw;w;nw;se;ne;nw;nw;se;se;ne;se;nw;sw;nw;e;w;ne;sw;w;e;se;ne;n;s;ne;sw;e;w;nw;se;e;w;sw;nw;n;s;sw;ne;se;ne;w;e;sw;event_1_40536215;n'
             }
         }
     };
@@ -5511,36 +5515,6 @@ window.setTimeout(function () {
             }
         }, {
         }, {
-            label: '极武坛',
-            title: '跨服副本一极武坛...',
-            id: 'id-repeater-stateless',
-
-            async eventOnClick () {
-                if (System.isLocalServer()) {
-                    window.alert('当前不在跨服，不能进入极武坛。');
-                    return;
-                }
-
-                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
-                let notifyTeamRequired = false;
-                if (TeamworkHelper.isTeamworkModeOn()) {
-                    if (TeamworkHelper.Role.isTeamLead()) {
-                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
-                        notifyTeamRequired = true;
-                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
-                        return;
-                    }
-                }
-
-                if (window.confirm(`本操作会进入到跨服副本一极武坛前，确定继续？\n\n注意：\n${warning}`)) {
-                    await Navigation.move(PathManager.getPathForSpecificEvent('极武坛前'));
-
-                    if (notifyTeamRequired) {
-                        TeamworkHelper.Navigation.notifyTeamWithPath('极武坛前', PathManager.getPathForSpecificEvent('极武坛前'));
-                    }
-                }
-            }
-        }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater-stateless',
@@ -6088,6 +6062,72 @@ window.setTimeout(function () {
                 }
             }
         }, {
+        }, {
+            label: '极武',
+            title: '一键把队伍召集到极武坛开打位置...',
+            id: 'id-jiwu-stateless',
+            width: '40px',
+            marginRight: '1px',
+
+            async eventOnClick () {
+                if (System.isLocalServer()) {
+                    window.alert('当前不在跨服，不能进入极武坛。');
+                    return;
+                }
+
+                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
+                let notifyTeamRequired = false;
+                if (TeamworkHelper.isTeamworkModeOn()) {
+                    if (TeamworkHelper.Role.isTeamLead()) {
+                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
+                        notifyTeamRequired = true;
+                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
+                        return;
+                    }
+                }
+
+                if (window.confirm(`本操作会进入到跨服副本一极武坛前，确定继续？\n\n注意：\n${warning}`)) {
+                    await Navigation.move(PathManager.getPathForSpecificEvent('极武坛前'));
+
+                    if (notifyTeamRequired) {
+                        TeamworkHelper.Navigation.notifyTeamForSpecialEvent('极武坛前');
+                    }
+                }
+            }
+        }, {
+            label: '打',
+            title: '一键从极武坛前开始，按既定路径自动寻找路径并叫杀 npc...',
+            width: '38px',
+            id: 'id-jiwu-fire-stateless',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (Objects.Room.getMapId() !== 'jiwutan') {
+                        window.alert('本功能只支持极武坛，注意：请从极武坛前开始。');
+                        ButtonManager.resetButtonById(this.id);
+                        return;
+                    }
+
+                    if (TeamworkHelper.isTeamworkModeOn() && !TeamworkHelper.Role.isTeamLead()) {
+                        if (!window.confirm('当前不是队长，确定要自己杀？')) {
+                            return;
+                        } else {
+                            ButtonManager.resetButtonById(this.id);
+                            return;
+                        }
+                    }
+
+                    if (window.confirm('确定开始按既定路径, 自动寻找路径并叫杀极武坛 npc?')) {
+                        GenericMapCleaner.initialize(true, PathManager.getPathForSpecificEvent('极武坛扫荡').split(';').extract(), 5000);
+                        await GenericMapCleaner.start();
+                    } else {
+                        ButtonManager.resetButtonById(this.id);
+                    }
+                } else {
+                    GenericMapCleaner.stop();
+                }
+            }
+        }, {            
         }, {
             label: '逃犯',
             title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 指定逃犯相关的事件',
