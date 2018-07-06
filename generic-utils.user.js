@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.101
+// @version      2.1.102
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1789,7 +1789,7 @@ window.setTimeout(function () {
             },
 
             notifyTeamWithPath (alias, path) {
-                TeamworkHelper.teamChat(`全体注意，目标${alias}，路径${path}。`);
+                TeamworkHelper.teamChat(`全体注意，目标${alias}，路径${path.replace(/ /g, '%')}。`);
             }
         },
 
@@ -4359,7 +4359,7 @@ window.setTimeout(function () {
             System.setVariant(System.keys.PATH_CUSTOMIZED, path);
         },
 
-        getCustomizedPath () {
+        getSafeZonePath () {
             return System.getVariant(System.keys.PATH_CUSTOMIZED);
         },
 
@@ -5635,11 +5635,15 @@ window.setTimeout(function () {
             async eventOnClick () {
                 await EscapeHelper.tryOneoffEscape();
 
-                let path = PathManager.getCustomizedPath();
+                let path = PathManager.getSafeZonePath();
                 if (!path) {
                     $('#id-customized-path-setting').click();
                 } else {
                     Navigation.move(path);
+
+                    if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead()) {
+                        TeamworkHelper.Navigation.notifyTeamWithPath('安全区', PathManager.getSafeZonePath());
+                    }
                 }
             }
         }, {
@@ -5649,7 +5653,7 @@ window.setTimeout(function () {
             id: 'id-customized-path-setting',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入对应路径：\n\n比如白驼往上一步：jh 21;n', PathManager.getCustomizedPath());
+                let answer = window.prompt('请按格式输入对应路径：\n\n比如白驼往上一步：jh 21;n', PathManager.getSafeZonePath());
                 if (answer) {
                     PathManager.setCustomizedPath(answer);
                 }
@@ -5826,7 +5830,7 @@ window.setTimeout(function () {
                     await Navigation.move(ForestHelper.getStartPointPath());
 
                     if (notifyTeamRequired) {
-                        TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath().replace(/ /g, '%'));
+                        TeamworkHelper.Navigation.notifyTeamWithPath(ForestHelper.getStartPointPathAlias(), ForestHelper.getStartPointPath());
                     }
                 }
             }
@@ -6127,7 +6131,7 @@ window.setTimeout(function () {
                     GenericMapCleaner.stop();
                 }
             }
-        }, {            
+        }, {
         }, {
             label: '逃犯',
             title: '自动寻路到跨服逃犯所在地点...\n\n注意：\n1. 请先到跨服\n2. 指定逃犯相关的事件',
