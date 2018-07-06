@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.99
+// @version      2.1.100
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -140,7 +140,13 @@ window.setTimeout(function () {
         _automatedReconnect: false,
 
         ansiToText (valueWithColor) {
+            if (!valueWithColor) return '';
+            
             return window.unsafeWindow.ansi_up.ansi_to_text(valueWithColor);
+        },
+
+        replaceControlCharBlank (valueWithColor) {
+            return window.unsafeWindow.g_simul_efun.replaceControlCharBlank(valueWithColor);
         },
 
         resetTitle () {
@@ -3209,7 +3215,7 @@ window.setTimeout(function () {
             },
 
             getItemQuantityByName (name = '') {
-                let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.ansiToText(v['value']).includes(`,${name},`));
+                let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.replaceControlCharBlank(v['value']).includes(`,${name},`));
                 if (records.length === 0) return 0;
 
                 return parseInt(records[0]['value'].split(',')[2]);
@@ -4913,7 +4919,8 @@ window.setTimeout(function () {
                 '峨嵋军阵劳军': 'e;e;n;event_1_19360932 go',
                 '白驼闯阵入口青铜盾阵': 'jh 21;#4 n;w',
 
-                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1500;~幽荧殿;#4 s;#3 w'
+                '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1500;~幽荧殿;#4 s;#3 w',
+                '极武坛前': 'fb 1;#wait 1000;w;s;e'
             }
         }
     };
@@ -5503,6 +5510,36 @@ window.setTimeout(function () {
 
             }
         }, {
+        }, {
+            label: '极武坛',
+            title: '跨服副本一极武坛...',
+            id: 'id-repeater-stateless',
+
+            async eventOnClick () {
+                if (System.isLocalServer()) {
+                    window.alert('当前不在跨服，不能进入极武坛。');
+                    return;
+                }
+
+                let warning = '当前没有组队或者不是队长，同组队员不会同步行动。';
+                let notifyTeamRequired = false;
+                if (TeamworkHelper.isTeamworkModeOn()) {
+                    if (TeamworkHelper.Role.isTeamLead()) {
+                        warning = '当前为组队模式的队长，相关有开启队员模式的成员会接到指令同步出发到目的地。';
+                        notifyTeamRequired = true;
+                    } else if (!window.confirm('当前不是队长，确定要自己去？')) {
+                        return;
+                    }
+                }
+
+                if (window.confirm(`本操作会进入到跨服副本一极武坛前，确定继续？\n\n注意：\n${warning}`)) {
+                    await Navigation.move(PathManager.getPathForSpecificEvent('极武坛前'));
+
+                    if (notifyTeamRequired) {
+                        TeamworkHelper.Navigation.notifyTeamWithPath('极武坛前', PathManager.getPathForSpecificEvent('极武坛前'));
+                    }
+                }
+            }
         }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
