@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.98
+// @version      2.1.99
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -4894,7 +4894,6 @@ window.setTimeout(function () {
                 '冰湖': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;e',
                 '扬州出发钓鱼加玄铁': 'jh 5;#10 n;ne;chuhaigo;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
                 '钓鱼加玄铁': 'jh 35;#3 nw;n;ne;nw;w;nw;#5 e;se;n;n;w;n;w;event_1_53278632;sousuo;sousuo;cancel_prompt;s;e;s;e;s;s;e',
-                '云远寺地室': 'jh 2;#16 n;w;#4 s;e;event_1_2215721',
                 '蜀山剑派': 'jh 14;sw;s;e;s;s;sw;sw;w;w;s;s;#3 e;n;ne;e;se;s',
 
                 '琅嬛玉洞': 'event_1_61856223;nw;event_1_92817399;w;event_1_91110342;s;event_1_74276536;se;event_1_14726005;sw;event_1_66980486;nw;event_1_39972900;nw;event_1_61689122;w;event_1_19336706;s;event_1_30457951;sw;event_1_96023188;s',
@@ -4907,6 +4906,7 @@ window.setTimeout(function () {
                 '苗疆沼泽': 'ne;nw;ne;ne;n;n;w',
                 '山坳年兽': 'jh 1;e;#5 n',
 
+                '云远寺地室': 'jh 2;#16 n;w;#4 s;e;event_1_2215721',
                 '恒山武安君庙': 'jh 9;event_1_20960851',
                 '青城孽龙': 'jh 15;n;nw;w;nw;n;event_1_14401179',
                 '峨嵋军阵钓鱼山脚': 'jh 8;ne;#3 e;n',
@@ -5654,15 +5654,6 @@ window.setTimeout(function () {
                     RemoteServerHelper.switch2RemoteServer();
                 } else {
                     RemoteServerHelper.switchBack2LocalServer();
-                }
-            }
-        }, {
-            label: '云远寺',
-            title: '一键走到地图碎片所在地室...',
-
-            eventOnClick () {
-                if (window.confirm('确定去西安云远寺地室？')) {
-                    Navigation.move(PathManager.getPathForSpecificEvent('云远寺地室'));
                 }
             }
         }, {
@@ -6617,6 +6608,13 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 Navigation.move(PathManager.getPathForSpecificEvent('星宿射鸟'));
+            }
+        }, {
+            label: '云远寺',
+            title: '一键从任意处走到云远寺地室...',
+
+            eventOnClick () {
+                TeamworkHelper.Navigation.goto('云远寺地室');
             }
         }, {
         }, {
