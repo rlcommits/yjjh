@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.103
+// @version      2.1.104
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3512,7 +3512,7 @@ window.setTimeout(function () {
         _bodySearch: false,
         _maxEnforce: true,
 
-        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true, roomName = '') {
+        initialize (travelsalByGivenPath = true, path = [], intervalForBreak = 2500, regexExpressionFilter = new RegexExpressionFilter(), bodySearch = false, maxEnforce = true, roomName = '', teamMoveByCommand = true) {
             debugging('初始化地图清理模式...');
 
             GenericMapCleaner._stop = false;
@@ -3523,6 +3523,7 @@ window.setTimeout(function () {
             GenericMapCleaner._bodySearch = bodySearch;
             GenericMapCleaner._maxEnforce = maxEnforce;
             GenericMapCleaner._roomName = roomName;
+            GenericMapCleaner._teamMoveByCommand = teamMoveByCommand;
 
             GenericMapCleaner._retry.initialize(GenericMapCleaner._killAndMove, function stopWhen () {
                 return GenericMapCleaner._stop;
@@ -3578,7 +3579,7 @@ window.setTimeout(function () {
                         let direction = GenericMapCleaner._path.shift();
                         await Navigation.move(direction);
 
-                        if (TeamworkHelper.Role.isTeamLead(User.getName())) {
+                        if (TeamworkHelper.Role.isTeamLead(User.getName()) && GenericMapCleaner._teamMoveByCommand) {
                             TeamworkHelper.Navigation.notifyTeamForMove(direction);
                         }
                     }
@@ -5889,7 +5890,7 @@ window.setTimeout(function () {
                     }
 
                     if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
-                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000);
+                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000, new RegexExpressionFilter(), false, true, '', false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -5928,7 +5929,7 @@ window.setTimeout(function () {
 
                     if (window.confirm(`确定开始随机走图且叫杀如下指定 npc?\n${blacklist}${whitelist}`)) {
                         let filter = new RegexExpressionFilter(TianjianValleyHelper.getRegexExpression4Match(), TianjianValleyHelper.getRegexExpression4Exclusion());
-                        GenericMapCleaner.initialize(false, [], TianjianValleyHelper.getInterval(), filter, false, true, TianjianValleyHelper.getRoomName());
+                        GenericMapCleaner.initialize(false, [], TianjianValleyHelper.getInterval(), filter, false, true, TianjianValleyHelper.getRoomName(), false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -6232,7 +6233,7 @@ window.setTimeout(function () {
                     ].join(';');
                 }
 
-                await ButtonManager.click(commands);
+                await ButtonManager.click(commands, 300);
                 await ButtonManager.click('auto_fight 0;enforce ' + User.attributes.getMaxEnforce());
             }
         }, {
