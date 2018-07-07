@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.105
+// @version      2.1.106
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1840,24 +1840,6 @@ window.setTimeout(function () {
     };
 
     var MonitorCenter = {
-        Knight: {
-            turnOn () {
-                InterceptorRegistry.register(new Interceptor('对话奇侠', MonitorCenter.Knight.event, MonitorCenter.Knight.action, 'main_msg'));
-            },
-
-            turnOff () {
-                InterceptorRegistry.unregister('对话奇侠');
-            },
-
-            event (message) {
-
-            },
-
-            action (message) {
-
-            }
-        },
-
         MurderPreventer: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('防杀气叫杀', MonitorCenter.MurderPreventer.battleHappened, MonitorCenter.MurderPreventer.escape, 'main_msg'));
@@ -2021,6 +2003,11 @@ window.setTimeout(function () {
     var KnightManager = {
         _puppetSkills: ['茅山道术', '天师灭神剑'],
         _REG_SECRET_TREASURE: '.*?对你悄声道：你现在去(.*?)，.*?',
+        _continuousTalkOnly: false,
+
+        setContinuousTalkOnly (continuousTalkOnly) {
+            KnightManager._continuousTalkOnly = continuousTalkOnly;
+        },
 
         async detectUserSettings () {
             System.setVariant(System.keys.KEY_KNIGHT_NAME, await detectKeyKnight());
@@ -2061,11 +2048,36 @@ window.setTimeout(function () {
             await Objects.Npc.action(new Npc(name), action);
         },
 
-        async improveFriendship (name) {
-            await ButtonManager.click('score');
-            await ButtonManager.click('prev;enforce 0');
+        talkedAlready (message, name) {
+            return message.match([`${name}盯着你看了一会儿。`,
+                `${name}挺有兴致地跟你聊了起来。`,
+                `${name}睁大眼睛望着你，似乎想问你天气怎么样。`,
+                `${name}说道：嗯....江湖上好玩吗？`,
+                `${name}疑惑地看着你，道：你想干什么？`,
+                `${name}摇摇头，说道：你在这做什么？`,
+                '郭济说道：排云掌法威力奇大，招式飘忽，似乎当年创出此掌法之人出自嵩山，你替我找找看是否还有后人存在'
+            ].join(`|`));
+        },
 
+        async improveFriendship (name) {
             await KnightManager.capture(name);
+
+            if (KnightManager._continuousTalkOnly) {
+                await Objects.Npc.action(new Npc(name), '对话');
+                await ExecutionManager.wait(500);
+
+                let message = Panels.Notices.getLastMessage();
+                if (message.includes(`${name}对你悄声道`)) {
+                    return;
+                } else if (message.includes('今日亲密度操作次数(20/20)') || KnightManager.talkedAlready(message, name)) {
+                    return;
+                } else if (message.includes('今日亲密度操作次数')) {
+                    await KnightManager.improveFriendship(name);
+                }
+
+                return;
+            }
+
             if (await Objects.Npc.hasAction(new Npc(name), '观战')) {
                 await Objects.Npc.action(new Npc(name), '观战');
                 await ExecutionManager.wait(1500);
@@ -2074,6 +2086,7 @@ window.setTimeout(function () {
                 }
             }
 
+            EnforceHelper.snapshotEnforce();
             await fight(name, '比试', KnightManager._puppetSkills, new CustomizedEvent(this.puppetExists, this.escape));
 
             Objects.Room.refresh();
@@ -2081,7 +2094,7 @@ window.setTimeout(function () {
             let puppetName = Objects.Room.hasNpc('金甲符兵') ? '金甲符兵' : '玄阴符兵';
             await fight(puppetName, '比试');
 
-            await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
+            EnforceHelper.recoverEnforce();
 
             async function fight (name, action, skills, additionalStopEvent) {
                 let combat = new Combat();
@@ -6773,6 +6786,18 @@ window.setTimeout(function () {
                 $('#id-please-knight').text(KnightManager.getKeyKnight());
             }
         }, {
+            label: '只对话撩',
+            title: '如嫌比试麻烦，可打开此开关则撩奇侠变成直接对话，且自动连续直至出秘境...',
+            id: 'id-knight-continuous-talks-only',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    KnightManager.setContinuousTalkOnly(true);
+                } else {
+                    KnightManager.setContinuousTalkOnly(false);
+                }
+            }
+        }, {
             label: '秘',
             title: '根据最新出现的秘境提示行走至目的地...\n\n注意：暂不支持自动判断最大化搜索收益。',
             width: '38px',
@@ -6911,18 +6936,6 @@ window.setTimeout(function () {
                 }
 
                 await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送15金锭');
-            }
-        }, {
-            label: '只对话撩',
-            title: '如嫌比试麻烦，可用此功能自动连续对话至出秘境...',
-            id: 'id-knight-continous-talks-stateless',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    MonitorCenter.Knight.turnOn();
-                } else {
-                    MonitorCenter.Knight.turnOff();
-                }
             }
         }, {
             label: '一键果子',
