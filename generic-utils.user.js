@@ -1840,6 +1840,24 @@ window.setTimeout(function () {
     };
 
     var MonitorCenter = {
+        Knight: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('对话奇侠', MonitorCenter.Knight.event, MonitorCenter.Knight.action, 'main_msg'));
+            },
+
+            turnOff () {
+
+            },
+
+            event (message) {
+
+            },
+
+            action (message) {
+
+            }
+        },
+
         MurderPreventer: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('防杀气叫杀', MonitorCenter.MurderPreventer.battleHappened, MonitorCenter.MurderPreventer.escape, 'main_msg'));
@@ -6881,6 +6899,18 @@ window.setTimeout(function () {
                 }
 
                 await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送15金锭');
+            }
+        }, {
+            label: '只对话撩',
+            title: '如嫌比试麻烦，可用此功能自动连续对话至出秘境...',
+            id: 'id-knight-continous-talks-stateless',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Knight.turnOn();
+                } else {
+                    MonitorCenter.Knight.turnOff();
+                }
             }
         }, {
             label: '一键果子',
