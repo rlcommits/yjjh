@@ -5439,7 +5439,6 @@ window.setTimeout(function () {
             id: 'id-continue-breakthrough',
             width: '60px',
             marginRight: '1px',
-            hidden: true,
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
@@ -5462,7 +5461,7 @@ window.setTimeout(function () {
             hidden: true,
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入要自动突破的技能和目标等级，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3...\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
+                let answer = window.prompt('请按格式输入要自动突破的技能和目标等级，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
                 if (answer || answer === '') {
                     SkillHelper.Breakthrough.setConfiguration(answer);
                 }
