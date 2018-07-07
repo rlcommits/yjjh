@@ -1846,7 +1846,7 @@ window.setTimeout(function () {
             },
 
             turnOff () {
-
+                InterceptorRegistry.unregister('对话奇侠');
             },
 
             event (message) {
@@ -4840,7 +4840,6 @@ window.setTimeout(function () {
                     '大理-兵营': 'jh 33;sw;sw;#8 s;w;s',
                     '大理-碧鸡山顶': 'jh 33;sw;sw;#4 s;#4 e;se;s;e',
                     '大理-剑川镇': 'jh 33;sw;sw;#3 s;nw;n;nw;n',
-                    '大理-茶花山': 'jh 33;sw;sw;#4 s;e;e',
                     '大理-渔家': 'jh 33;sw;sw;#14 s;se;sw;w',
                     '大理-议事厅': 'jh 33;sw;sw;#8 s;w;n;se;ne',
                     '大理-议事堂': 'jh 33;sw;sw;#14 s;e;n;n',
@@ -5701,6 +5700,19 @@ window.setTimeout(function () {
                     RemoteServerHelper.switchBack2LocalServer();
                 }
             }
+        }, {
+            label: '帮派议事',
+            title: '一键到帮派议事厅\n\n注意：如果在队长模式会召唤所有队员一起到大厅。',
+            id: 'id-goto-clan',
+
+            async eventOnClick () {
+                await ButtonManager.click('clan scene');
+
+                if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead()) {
+                    TeamworkHelper.Navigation.notifyTeamWithPath('帮派议事厅', 'clan scene');
+                }
+            }
+        }, {
         }, {
             label: '九老洞',
             title: '一键到九老洞',
