@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.106
+// @version      2.1.107
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -237,7 +237,8 @@ window.setTimeout(function () {
             EQUIPMENT_COMBAT: 'equipment.combat',
             EQUIPMENT_STUDY: 'equipment.study',
             GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas',
-            FUGITIVE_NAMES: 'fugitive.names'
+            FUGITIVE_NAMES: 'fugitive.names',
+            BREAKTHROUGH_TARGET_LEVEL: 'breakthrough.target.level'
         },
 
         logCurrentSettings () {
@@ -1799,7 +1800,11 @@ window.setTimeout(function () {
     };
 
     var SkillHelper = {
-        getSkillByName (name) {
+        async prepareSkill (skillId) {
+            await ButtonManager.click(`enableskill enable ${skillId} attack_select`);
+        },
+
+        getSkillIdByName (name) {
             let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
             if (record.length) {
                 let matches = record.split(',');
@@ -1808,23 +1813,44 @@ window.setTimeout(function () {
         },
 
         Breakthrough: {
-            getCurrentLevel () {
+            async getCurrentLevel (skillId) {
+                await ButtonManager.click(`skills info ${User.getId()} ${skillId}`);
+
+                let matches = $('span:contains(有效系数)').text().match(/突破技能有效系数\+([0-9]+)/);
+                await ButtonManager.click('prev');
+                return matches ? parseInt(matches[1]) : 999;
             },
 
-            getTargetLevel () {
-
+            prepareDefaultSkills () {
+                let conf = SkillHelper.Breakthrough.getConfiguration();
+                if (!conf.includes('恢复技能=')) {
+                    log('没有设置默认技能方案，脚本自动选择方案1。');
+                    return 1;
+                } else {
+                    return parseInt(conf.match(/恢复技能=([0-9]+)/)[1]);
+                }
             },
 
-            async continue (skill) {
-                await ButtonManager.click(`tuopo go,${skill.getId()}`);
+            getTargetLevel (skillName) {
+                let conf = SkillHelper.Breakthrough.getConfiguration();
+                if (!conf.includes(skillName)) {
+                    log(`${skillName}没有设置自动突破目标。`);
+                    return 0;
+                }
+
+                return parseInt(conf.match(`${skillName}=([0-9]+)`)[1]);
             },
 
-            setConfiguration () {
+            async continue (skillId) {
+                await ButtonManager.click(`tuopo go,${skillId}`);
+            },
 
+            setConfiguration (conf) {
+                return System.setVariant(System.keys.BREAKTHROUGH_TARGET_LEVEL, conf);
             },
 
             getConfiguration () {
-
+                return System.getVariant(System.keys.BREAKTHROUGH_TARGET_LEVEL);
             }
         }
     };
@@ -1887,22 +1913,32 @@ window.setTimeout(function () {
             },
 
             done (message) {
-                return message.get('msg').startsWith('[1;33m成功突破。');
+                return message.get('msg').includes('成功突破。');
             },
 
             async continue (message) {
                 debugging('判定是否需要继续突破...');
                 let matches = message.get('msg').match('你的(.*?)成功突破了');
                 if (matches) {
-                    let skill = SkillHelper.getSkillByName(matches[1]);
-                    let currentLevel = SkillHelper.Breakthrough.getCurrentLevel(skill);
-                    let targetLevel = SkillHelper.Breakthrough.getTargetLevel(skill);
+                    let skillName = matches[1];
+                    if (!SkillHelper.Breakthrough.getConfiguration().includes(skillName)) {
+                        log(`${skillName}没有设置突破...`);
+                        return;
+                    }
+
+                    let skillId = SkillHelper.getSkillIdByName(skillName);
+                    let currentLevel = await SkillHelper.Breakthrough.getCurrentLevel(skillId);
+                    let targetLevel = SkillHelper.Breakthrough.getTargetLevel(skillName);
 
                     if (currentLevel < targetLevel) {
                         debugging(`当前等级 ${currentLevel} 小于目标等级 ${targetLevel}，开始尝试继续突破...`);
 
-                        await SkillHelper.Breakthrough.continue(skill);
-                        log(`开始突破${skill.getName()}，${currentLevel}->${targetLevel}`);
+                        await SkillHelper.prepareSkill(skillId);
+                        await SkillHelper.Breakthrough.continue(skillId);
+                        await SkillManager.reEnableSkills(SkillHelper.Breakthrough.prepareDefaultSkills());
+                        log(`开始突破${skillName}，${currentLevel}->${targetLevel}`);
+                    } else {
+                        log(`${skillName}已经达到突破目标等级${targetLevel}，不再继续突破。`);
                     }
                 }
             }
