@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.104
+// @version      2.1.105
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1840,6 +1840,24 @@ window.setTimeout(function () {
     };
 
     var MonitorCenter = {
+        Knight: {
+            turnOn () {
+                InterceptorRegistry.register(new Interceptor('对话奇侠', MonitorCenter.Knight.event, MonitorCenter.Knight.action, 'main_msg'));
+            },
+
+            turnOff () {
+                InterceptorRegistry.unregister('对话奇侠');
+            },
+
+            event (message) {
+
+            },
+
+            action (message) {
+
+            }
+        },
+
         MurderPreventer: {
             turnOn () {
                 InterceptorRegistry.register(new Interceptor('防杀气叫杀', MonitorCenter.MurderPreventer.battleHappened, MonitorCenter.MurderPreventer.escape, 'main_msg'));
@@ -4822,7 +4840,6 @@ window.setTimeout(function () {
                     '大理-兵营': 'jh 33;sw;sw;#8 s;w;s',
                     '大理-碧鸡山顶': 'jh 33;sw;sw;#4 s;#4 e;se;s;e',
                     '大理-剑川镇': 'jh 33;sw;sw;#3 s;nw;n;nw;n',
-                    '大理-茶花山': 'jh 33;sw;sw;#4 s;e;e',
                     '大理-渔家': 'jh 33;sw;sw;#14 s;se;sw;w',
                     '大理-议事厅': 'jh 33;sw;sw;#8 s;w;n;se;ne',
                     '大理-议事堂': 'jh 33;sw;sw;#14 s;e;n;n',
@@ -5683,6 +5700,19 @@ window.setTimeout(function () {
                     RemoteServerHelper.switchBack2LocalServer();
                 }
             }
+        }, {
+            label: '帮派议事',
+            title: '一键到帮派议事厅\n\n注意：如果在队长模式会召唤所有队员一起到大厅。',
+            id: 'id-goto-clan',
+
+            async eventOnClick () {
+                await ButtonManager.click('clan scene');
+
+                if (TeamworkHelper.isTeamworkModeOn() && TeamworkHelper.Role.isTeamLead()) {
+                    TeamworkHelper.Navigation.notifyTeamWithPath('帮派议事厅', 'clan scene');
+                }
+            }
+        }, {
         }, {
             label: '九老洞',
             title: '一键到九老洞',
@@ -6881,6 +6911,18 @@ window.setTimeout(function () {
                 }
 
                 await KnightManager.giveGold(System.getVariant(System.keys.KEY_KNIGHT_NAME), '赠送15金锭');
+            }
+        }, {
+            label: '只对话撩',
+            title: '如嫌比试麻烦，可用此功能自动连续对话至出秘境...',
+            id: 'id-knight-continous-talks-stateless',
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    MonitorCenter.Knight.turnOn();
+                } else {
+                    MonitorCenter.Knight.turnOff();
+                }
             }
         }, {
             label: '一键果子',
