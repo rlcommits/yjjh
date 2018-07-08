@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.109
+// @version      2.1.110
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5458,7 +5458,6 @@ window.setTimeout(function () {
             title: '设置突破细节...',
             id: 'id-continue-breakthrough-setting',
             width: '10px',
-            hidden: true,
 
             async eventOnClick () {
                 let answer = window.prompt('请按格式输入要自动突破的技能和目标等级，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
