@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.107
+// @version      2.1.108
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1913,12 +1913,12 @@ window.setTimeout(function () {
             },
 
             done (message) {
-                return message.get('msg').includes('成功突破。');
+                return message.get('msg').includes('成功向前突破了');
             },
 
             async continue (message) {
                 debugging('判定是否需要继续突破...');
-                let matches = message.get('msg').match('你的(.*?)成功突破了');
+                let matches = message.get('msg').match('你的(.*?)成功向前突破了');
                 if (matches) {
                     let skillName = matches[1];
                     if (!SkillHelper.Breakthrough.getConfiguration().includes(skillName)) {
