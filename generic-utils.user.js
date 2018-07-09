@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.113
+// @version      2.1.114
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -234,8 +234,7 @@ window.setTimeout(function () {
             ITEMS_TO_USE: 'packing.use',
             MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
             PATH_CUSTOMIZED: 'customizations.user.path',
-            EQUIPMENT_COMBAT: 'equipment.combat',
-            EQUIPMENT_STUDY: 'equipment.study',
+            EQUIPMENT_MODE: 'equipment.mode',
             GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas',
             FUGITIVE_NAMES: 'fugitive.names',
             BREAKTHROUGH_TARGET_LEVEL: 'breakthrough.target.level'
@@ -782,46 +781,75 @@ window.setTimeout(function () {
     };
 
     var EquipmentHelper = {
-        combatItemsByDefault: [],
-        studyItemsByDefault: [],
-
-        combat: ['九天龙吟剑', '天罡拳套'].join(','),
-        study: ['迷幻经纶'].join(','),
-
-        async switch2CombatMode () {
-            window.alert('本功能尚未完成');
+        getCurrentSetting () {
+            return System.getVariant(System.keys.EQUIPMENT_MODE, '九天龙吟剑/风泉之剑/风泉之剑;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒');
         },
 
-        async quitCombatMode () {
+        saveNewSetting (setting) {
+            System.setVariant(System.keys.EQUIPMENT_MODE, setting);
+        },
 
+        async switch2CombatMode () {
+            await EquipmentHelper._wear(0);
         },
 
         async switch2StudyMode () {
-            await EquipmentHelper._wear(EquipmentHelper.getDresses(System.keys.EQUIPMENTS_FOR_STUDY, EquipmentHelper.studyItemsByDefault));
+            await EquipmentHelper._wear(1);
         },
 
-        async quitStudyMode () {
-
+        async switch2NormalMode () {
+            await EquipmentHelper._wear(2);
         },
 
-        getDresses (key) {
-            return System.getVariant(key);
-        },
+        async _wear (modeIndex) {
+            let namePatternsToMatch = EquipmentHelper.getCurrentSetting().split(';').map(v => v.split('/')[modeIndex]).join('|');
+            let equipmentsToUse = System.globalObjectMap.get('msg_items').elements.filter(function (v) {
+                if (!v['key'].startsWith('items')) return false;
 
-        getWeapons () {
+                let values = Array.isArray(v['value']) ? v['value'][1] : v['value'];
+                return System.ansiToText(values).match(namePatternsToMatch);
+            }).map(function (o) {
+                let values = Array.isArray(o['value']) ? o['value'].join(',') : o['value'];
+                let properties = System.ansiToText(values).split(',');
+                let action = properties[0].match('weapon|sword') ? 'wield' : 'wear';
 
-        },
+                let result = new Equipment(properties[0], properties[1], properties[3] === '1', action);
+                debugging(result);
+                return result;
+            });
 
-        async _wear (dresses = []) {
+            for (let i = 0; i < equipmentsToUse.length; i++) {
+                if (!equipmentsToUse[i].inUse()) {
+                    await ButtonManager.click(`${equipmentsToUse[i].getAction()} ${equipmentsToUse[i].getId()}`);
+                } else {
+                    debugging(`${equipmentsToUse[i].getName()}已经装备。`);
+                }
+            }
+        }
+    };
 
-        },
+    class Equipment {
+        constructor (id, name, inUse, action) {
+            this._id = id;
+            this._name = name;
+            this._inUse = inUse;
+            this._action = action;
+        }
 
-        async _wield (weapons = []) {
+        getId () {
+            return this._id;
+        }
 
-        },
+        getName () {
+            return this._name;
+        }
 
-        getExistingSetting (key, defaultValue) {
+        inUse () {
+            return this._inUse;
+        }
 
+        getAction () {
+            return this._action;
         }
     };
 
@@ -1805,7 +1833,7 @@ window.setTimeout(function () {
         },
 
         getSkillIdByName (name) {
-            let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
+            let record = System.globalObjectMap.get('msg_skills').elements.filter(v => System.ansiToText(v['value']).includes(`,${name},`));
             if (record.length) {
                 return record[0]['value'].split(',')[0];
             }
@@ -5497,62 +5525,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '战斗装',
-            title: '按顺序装备预设的战斗装备，加力...\n\n注意：在战斗中临时切换也有效。',
-            id: 'id-equipment-for-combat-v2',
-            width: '60px',
-            marginRight: '1px',
-
-            async eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    EquipmentHelper.switch2CombatMode();
-
-                    EnforceHelper.maximizeEnforce();
-                    ButtonManager.resetButtonById('id-equipment-for-study-v2');
-                } else {
-                    EquipmentHelper.quitCombatMode();
-                }
-            }
-        }, {
-            label: '.',
-            title: '设置战斗装备...',
-            width: '10px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按顺序输入战斗模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_COMBAT, EquipmentHelper.combatItemsByDefault));
-                if (answer) {
-                    EquipmentHelper.setItemsForCombat(answer);
-                }
-            }
-        }, {
-            label: '学习装',
-            title: '切换到悟性最高的装备...\n\n注意：在战斗中临时切换也有效。',
-            width: '60px',
-            marginRight: '1px',
-            id: 'id-equipment-for-study-v2',
-
-            eventOnClick () {
-                if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    EquipmentHelper.switch2StudyMode();
-
-                    EnforceHelper.maximizeEnforce();
-                    ButtonManager.resetButtonById('id-equipment-for-study-v2');
-                } else {
-                    EquipmentHelper.quitCombatMode();
-                }
-            }
-        }, {
-            label: '.',
-            title: '设置学习装备...',
-            width: '10px',
-
-            async eventOnClick () {
-                let answer = window.prompt('请按顺序输入学习模式所需的武器和装备...\n\n注意：\n1. 必须是物品全名\n2. 装备名字之间以半角逗号隔开', EquipmentHelper.getExistingSetting(System.keys.EQUIPMENT_STUDY, EquipmentHelper.studyItemsByDefault));
-                if (answer) {
-                    EquipmentHelper.setItemsForCombat(answer);
-                }
-            }
-        }, {
         }, {
             label: '地图碎片',
             title: '一键走到地图碎片所在地室且定时巡逻，在设定好的血量阈值达到时发起战斗...',
@@ -6273,44 +6245,12 @@ window.setTimeout(function () {
             marginRight: '1px',
 
             async eventOnClick () {
-                let commands;
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    commands = [
-                        'unwield sword of windspring',
-                        'unwield weapon_sb_sword10',
-                        'unwield weapon_sb_sword11',
-                        'unwield weapon_moke_dagger10',
-                        'unwield weapon_moke_dagger11',
-                        'unwield weapon_sb_unarmed10',
-                        'unwield weapon_sb_unarmed11',
-                        'wield weapon_sb_sword10',
-                        'wield weapon_sb_sword11',
-                        'wield weapon_sb_unarmed10',
-                        'wield weapon_sb_unarmed11',
-                        'wield weapon_moke_dagger10',
-                        'wield weapon_moke_dagger11'
-                    ].join(';');
-
                     ButtonManager.resetButtonById('id-equipment-for-study');
+                    await EquipmentHelper.switch2CombatMode();
                 } else {
-                    commands = [
-                        'unwield sword of windspring',
-                        'unwield weapon_sb_sword10',
-                        'unwield weapon_sb_sword11',
-                        'unwield weapon_moke_dagger10',
-                        'unwield weapon_moke_dagger11',
-                        'unwield weapon_sb_unarmed10',
-                        'unwield weapon_sb_unarmed11',
-                        'wield sword of windspring',
-                        'wield weapon_sb_unarmed10',
-                        'wield weapon_sb_unarmed11',
-                        'wield weapon_moke_dagger10',
-                        'wield weapon_moke_dagger11'
-                    ].join(';');
+                    await EquipmentHelper.switch2NormalMode();
                 }
-
-                await ButtonManager.click(commands, 300);
-                await ButtonManager.click('auto_fight 0;enforce ' + User.attributes.getMaxEnforce());
             }
         }, {
             label: '学',
@@ -6318,13 +6258,22 @@ window.setTimeout(function () {
             width: '38px',
             id: 'id-equipment-for-study',
 
-            eventOnClick () {
+            async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    ButtonManager.click('wield sword of windspring;wear dream hat;wear longyuan banzhi moke');
-
                     ButtonManager.resetButtonById('id-equipment-for-combat');
+                    await EquipmentHelper.switch2StudyMode();
                 } else {
-                    ButtonManager.click('wield sword of windspring;wear equip_moke_head10;wear equip_moke_finger10');
+                    await EquipmentHelper.switch2NormalMode();
+                }
+            }
+        }, {
+            label: '模式设置',
+            title: '设置各种模式下的装备...',
+
+            async eventOnClick () {
+                let answer = window.prompt('请按顺序和格式预设战斗、学习以及普通模式武器和装备...\n\n例子：九天龙吟剑/风泉之剑/风泉之剑;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒\n\n注意：\n1. 必须是物品全名\n2. 模式间以斜线分隔，装备类型间以半角分号分隔', EquipmentHelper.getCurrentSetting());
+                if (answer) {
+                    EquipmentHelper.saveNewSetting(answer);
                 }
             }
         }, {
