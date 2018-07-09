@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.110
+// @version      2.1.111
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1895,7 +1895,7 @@ window.setTimeout(function () {
             },
 
             mapOpened (message) {
-                return System.ansiToText(message.get('msg')).match('【href;0;clan帮派0】.*?选择了.*?宝藏地图');
+                return System.ansiToText(message.get('msg')).match(/帮派.*?选择了.*?宝藏地图/);
             },
 
             async deliever (message) {
@@ -6724,52 +6724,109 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '自动处理',
+            title: '此开关打开时，以下战斗脚本会自动尝试连续进行...\n\n注意：\n1. 队长模式下队员无需开启此开关也会跟着打\n2. 目前版本可能会被杀气叫杀干扰不能正常工作\n3. 目前版本只支持青城孽龙、恒山、峨眉劳军、白坨军阵...',
+            id: 'id-automated-daily-battle',
+
+            eventOnClick () {
+                ButtonManager.simpleToggleButtonEvent(this);
+            }
+        }, {
             label: '青',
             width: '38px',
             marginRight: '1px',
             title: '一键从任意处到青城孽龙所在地...',
 
-            eventOnClick () {
-                TeamworkHelper.Navigation.goto('青城孽龙');
+            async eventOnClick () {
+                await TeamworkHelper.Navigation.goto('青城孽龙');
+
+                if (ButtonManager.isButtonPressed('id-automated-daily-battle')) {
+                    await ExecutionManager.wait(10000);
+                    let combat = new Combat();
+                    combat.initialize(Objects.Room.getAvailableNpcsV2()[0], '杀死');
+                    await combat.fire();
+
+                    $('#id-daily-battle-heng').click();
+                }
             }
         }, {
             label: '恒',
             width: '38px',
             title: '一键从任意处到恒山武安君庙...',
+            id: 'id-daily-battle-heng',
 
-            eventOnClick () {
+            async eventOnClick () {
                 TeamworkHelper.Navigation.goto('恒山武安君庙');
+
+                if (ButtonManager.isButtonPressed('id-automated-daily-battle')) {
+                    await ExecutionManager.wait(10000);
+                    let combat = new Combat();
+                    combat.initialize(Objects.Room.getAvailableNpcsV2()[0], '杀死');
+                    await combat.fire();
+
+                    $('#id-daily-battle-emei').click();
+                }
             }
         }, {
             label: '峨',
             width: '38px',
             marginRight: '1px',
             title: '一键从任意处到峨嵋军阵钓鱼山脚...',
+            id: 'id-daily-battle-emei',
 
-            eventOnClick () {
+            async eventOnClick () {
                 TeamworkHelper.Navigation.goto('峨嵋军阵钓鱼山脚');
+
+                if (ButtonManager.isButtonPressed('id-automated-daily-battle')) {
+                    await ExecutionManager.wait(10000);
+                    GenericMapCleaner.initialize(true, '#4 n'.split(';').extract(), 5000, new RegexExpressionFilter('', '军士'));
+                    await GenericMapCleaner.start();
+
+                    $('#id-emei-appreciate').click();
+                }
             }
         }, {
             label: '劳',
             width: '38px',
             title: '一键从峨嵋军阵金狼处到军械官所在地并捐赠一金锭劳军...',
+            id: 'id-emei-appreciate',
 
-            eventOnClick () {
+            async eventOnClick () {
                 if (Objects.Room.getName() !== '护国门') {
                     window.alert('请先走到护国门金狼死士所在地。');
                     return;
                 }
 
-                TeamworkHelper.Navigation.goto('峨嵋军阵劳军');
+                await TeamworkHelper.Navigation.goto('峨嵋军阵劳军');
+                if (ButtonManager.isButtonPressed('id-automated-daily-battle')) {
+                    await ExecutionManager.wait(5000);
+                    $('#id-daily-battle-baituo').click();
+                }
             }
         }, {
             label: '驼',
             title: '一键从任意处走到白驼闯阵入口青铜盾阵...',
             width: '38px',
             marginRight: '1px',
+            id: 'id-daily-battle-baituo',
 
-            eventOnClick () {
-                TeamworkHelper.Navigation.goto('白驼闯阵入口青铜盾阵');
+            async eventOnClick () {
+                await TeamworkHelper.Navigation.goto('白驼闯阵入口青铜盾阵');
+
+                if (ButtonManager.isButtonPressed('id-automated-daily-battle')) {
+                    await ExecutionManager.wait(10000);
+
+                    GenericMapCleaner.initialize(true, '#2 w'.split(';').extract(), 5000);
+                    await GenericMapCleaner.start();
+
+                    await TeamworkHelper.Navigation.move('西');
+                    await ExecutionManager.wait(5000);
+                    let combat = new Combat();
+                    combat.initialize(Objects.Room.getAvailableNpcsV2()[0], '比试');
+                    await combat.fire();
+
+                    await Navigation.move('home');
+                }
             }
         }, {
             label: '鸟',
