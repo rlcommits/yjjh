@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.111
+// @version      2.1.112
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1807,8 +1807,7 @@ window.setTimeout(function () {
         getSkillIdByName (name) {
             let record = System.globalObjectMap.get('msg_skills').elements.filter(v => v['value'].includes(`,${name},`));
             if (record.length) {
-                let matches = record.split(',');
-                return matches[2];
+                return record[0]['value'].split(',')[0];
             }
         },
 
@@ -1842,7 +1841,7 @@ window.setTimeout(function () {
             },
 
             async continue (skillId) {
-                await ButtonManager.click(`tuopo go,${skillId}`);
+                await ButtonManager.click(`tupo go,${skillId}`);
             },
 
             setConfiguration (conf) {
@@ -1905,7 +1904,7 @@ window.setTimeout(function () {
 
         Breakthrough: {
             turnOn () {
-                InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'main_msg'));
+                InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'channel', 'tell'));
             },
 
             turnOff () {
@@ -5742,9 +5741,9 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    RemoteServerHelper.switch2RemoteServer();
+                    await RemoteServerHelper.switch2RemoteServer();
                 } else {
-                    RemoteServerHelper.switchBack2LocalServer();
+                    await RemoteServerHelper.switchBack2LocalServer();
                 }
             }
         }, {
@@ -7934,7 +7933,7 @@ window.setTimeout(function () {
             ButtonManager.clearAllButtonStatus();
             System.reloadPreviousButtonStatus();
             System.resetTitle();
-        }, 'g_login', 'status'));
+        }, 'suc', 'reg_url'));
 
         InterceptorRegistry.register(new Interceptor('加力检测', function enforceChangeDetected (message) {
             return message.get('msg').includes('你决定每次使用');
