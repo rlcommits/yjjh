@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.114
+// @version      2.1.115
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -313,7 +313,7 @@ window.setTimeout(function () {
         _areaRange: '',
 
         async initialize () {
-            await ButtonManager.click('skills;team;friend;score;items;#5 prev');
+            await ButtonManager.click('items;skills;team;friend;score;#5 prev');
 
             User._areaRange = analyseAreaRange(User.getArea());
 
@@ -4294,7 +4294,7 @@ window.setTimeout(function () {
         log (message) {
             if (MessageLogger.isMessageInLoggingRejectedList(message)) return;
 
-            debugging(`${message.get('type')} | ${message.get('subtype')} | ${message.get('msg')}`, message.elements);
+            debugging(`msg: ${message.get('type')} | ${message.get('subtype')} | ${message.get('msg')}`, message.elements);
         }
     };
 
@@ -7877,12 +7877,13 @@ window.setTimeout(function () {
         InterceptorRegistry.register(new Interceptor('跨服切换检测', function worldChangeDetected (message) {
             return true;
         }, async function reloadButtonStatus (message) {
+            console.log('检测到服务器切换...');
             await ExecutionManager.wait(2000);
 
             ButtonManager.clearAllButtonStatus();
             System.reloadPreviousButtonStatus();
             System.resetTitle();
-        }, 'suc', 'reg_url'));
+        }, 'g_login', 'status'));
 
         InterceptorRegistry.register(new Interceptor('加力检测', function enforceChangeDetected (message) {
             return message.get('msg').includes('你决定每次使用');
