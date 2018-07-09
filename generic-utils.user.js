@@ -1904,7 +1904,7 @@ window.setTimeout(function () {
 
         Breakthrough: {
             turnOn () {
-                InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'channel', 'tell'));
+                InterceptorRegistry.register(new Interceptor('突破监控', MonitorCenter.Breakthrough.done, MonitorCenter.Breakthrough.continue, 'main_msg'));
             },
 
             turnOff () {
