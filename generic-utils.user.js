@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.112
+// @version      2.1.113
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1886,7 +1886,7 @@ window.setTimeout(function () {
 
         MapFragments: {
             turnOn () {
-                InterceptorRegistry.register(new Interceptor('开地图监控', MonitorCenter.MapFragments.mapOpened, MonitorCenter.MapFragments.deliever, 'channel', 'clan'));
+                InterceptorRegistry.register(new Interceptor('开地图监控', MonitorCenter.MapFragments.mapOpened, MonitorCenter.MapFragments.deliever, 'main_msg'));
             },
 
             turnOff () {
