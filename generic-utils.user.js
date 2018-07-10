@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.122
+// @version      2.1.123
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2878,20 +2878,39 @@ window.setTimeout(function () {
         },
 
         async recoverForce () {
-            let currentForce = System.globalObjectMap.get('msg_attrs').get('force');
-            let maxForce = System.globalObjectMap.get('msg_attrs').get('max_force');
-            let gap = maxForce - currentForce;
+            if (!System.isLocalServer()) {
+                let times = getForceGap() / 30000 + 1;
+                await ButtonManager.click(`#${times} items use snow_wannianlingzhi`);
+            } else {
+                let numberOf10k = Panels.Backpack.getDrugQuantityByName('万年灵芝');
+                debugging(`万年灵芝还剩 ${numberOf10k} 棵...`);
+                let numberOf1k = Panels.Backpack.getDrugQuantityByName('千年灵芝');
+                debugging(`千年灵芝还剩 ${numberOf1k} 棵...`);
 
-            for (; gap > 30000; gap -= 30000) {
-                await ButtonManager.click('items use snow_wannianlingzhi');
+                let gap = getForceGap();
+                if (gap > 30000) {
+                    if (numberOf10k) {
+                        await ButtonManager.click('items use snow_wannianlingzhi');
+                    } else if (numberOf1k) {
+                        await ButtonManager.click('items use snow_qiannianlingzhi');
+                    } else {
+                        debugging('没有足够的千/万年灵芝，停止服药。');
+                    }
+                } else if (gap > 2000) {
+                    if (numberOf1k) {
+                        await ButtonManager.click('items use snow_qiannianlingzhi');
+                    } else {
+                        debugging('没有足够的千年灵芝，停止服药。');
+                    }
+                } else {
+                    debugging('内力已足，无需服用灵芝。');
+                }
+
+                debugging(`当前状态 ${System.globalObjectMap.get('msg_attrs').get('force')}/${System.globalObjectMap.get('msg_attrs').get('max_force')}`);
             }
 
-            if (gap < 2000) {
-                log('内力已足 (' + currentForce + '/' + maxForce + ')，无需服用灵芝。');
-            } else {
-                let times = parseInt(gap / 5000);
-                await ButtonManager.click('#' + times + ' items use snow_qiannianlingzhi', 300);
-                log('服用 ' + times + ' 棵千年灵芝，当前状态 ' + System.globalObjectMap.get('msg_attrs').get('force') + '/' + maxForce);
+            function getForceGap () {
+                return System.globalObjectMap.get('msg_attrs').get('max_force') - System.globalObjectMap.get('msg_attrs').get('force');
             }
         }
     };
@@ -3324,6 +3343,16 @@ window.setTimeout(function () {
                 if (records.length === 0) return 0;
 
                 return parseInt(records[0]['value'].split(',')[2]);
+            },
+
+            getDrugQuantityByName (name = '') {
+                let records = System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(name));
+
+                debugging('records', records);
+                if (records.length === 0) return 0;
+
+                let values = Array.isArray(records[0]['value']) ? records[0]['value'].join(',') : records[0]['value'];
+                return parseInt(values.split(',')[2]);
             }
         }
     };
