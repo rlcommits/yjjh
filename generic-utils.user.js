@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.119
+// @version      2.1.120
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1831,6 +1831,7 @@ window.setTimeout(function () {
 
     var SkillHelper = {
         async prepareSkill (skillId) {
+            await ButtonManager.click(`enable ${skillId}`);
             await ButtonManager.click(`enableskill enable ${skillId} attack_select`);
         },
 
