@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.116
+// @version      2.1.117
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1006,7 +1006,7 @@ window.setTimeout(function () {
                 IdleChecker._lastRoom = currentRoom;
             } else {
                 log('检测到在外面发呆超过 ' + JobRegistry.getJob('id-idle-checker').getInterval() / (1000 * 60) + ' 分钟，安全起见自动打道回府。');
-                ButtonManager.click('home;look_room');
+                Navigation.move('home;look_room');
             }
         }
     };
@@ -2262,7 +2262,7 @@ window.setTimeout(function () {
                 if (window.confirm(buildPromptMessage('当前未对话奇侠依次如下，确认无误继续？\n\n', candidatesToTalk))) {
                     await talkToKnights(KnightManager.allCandidates);
 
-                    await ButtonManager.click('home');
+                    await Navigation.move('home');
                     log('所有奇侠对话尝试完毕，本轮跳过的有：' + KnightManager.allCandidates.filter((v) => !v.getTalked()).map(v => v.getName()));
                 }
             } else {
@@ -2626,7 +2626,7 @@ window.setTimeout(function () {
         },
 
         stopFishing () {
-            ButtonManager.click('home');
+            Navigation.move('home');
         }
     };
 
@@ -5197,7 +5197,7 @@ window.setTimeout(function () {
                     setTimeout(SnakeKiller.fire, 1000);
                 } else {
                     ButtonManager.resetButtonById('id-snake-killer');
-                    ButtonManager.click('home');
+                    Navigation.move('home');
                 }
             }
 
@@ -5271,7 +5271,10 @@ window.setTimeout(function () {
             let steps = path.split(';').extract();
 
             for (let i = 0; i < steps.length; i++) {
-                if (steps[i].includes('#wait ')) {
+                if (steps[i] === 'home' && !System.isLocalServer() && Objects.Room.getName().includes('武林广场')) {
+                    debugging('忽略回家命令：当前已经位于跨服武林广场，再执行回家命令就回到本服啦。');
+                    continue;
+                } else if (steps[i].includes('#wait ')) {
                     await ExecutionManager.wait(parseInt(steps[i].split(' ')[1]));
                 } else {
                     switch (steps[i][0]) {
