@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.115
+// @version      2.1.116
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -4157,7 +4157,7 @@ window.setTimeout(function () {
             function areaMatched (message) {
                 if (System.isLocalServer()) return true;
 
-                return message.includes(User.getAreaRange());
+                return message.includes(`[${User.getAreaRange()}区]`);
             }
         },
 
@@ -6881,7 +6881,7 @@ window.setTimeout(function () {
         }, {
             label: '扫荡',
             title: '根据最新出现的秘境提示自动扫荡取最大收益...',
-            id: 'id-auto-sweep',
+            id: 'id-auto-sweep-stateless',
             width: '60px',
             marginRight: '1px',
 
