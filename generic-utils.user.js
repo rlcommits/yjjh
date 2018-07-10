@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.121
+// @version      2.1.122
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2881,12 +2881,17 @@ window.setTimeout(function () {
             let currentForce = System.globalObjectMap.get('msg_attrs').get('force');
             let maxForce = System.globalObjectMap.get('msg_attrs').get('max_force');
             let gap = maxForce - currentForce;
+
+            for (; gap > 30000; gap -= 30000) {
+                await ButtonManager.click('items use snow_wannianlingzhi');
+            }
+
             if (gap < 2000) {
                 log('内力已足 (' + currentForce + '/' + maxForce + ')，无需服用灵芝。');
             } else {
                 let times = parseInt(gap / 5000);
                 await ButtonManager.click('#' + times + ' items use snow_qiannianlingzhi', 300);
-                log('服用 ' + times + ' 棵千年灵芝，当前状态 ' + currentForce + '/' + maxForce);
+                log('服用 ' + times + ' 棵千年灵芝，当前状态 ' + System.globalObjectMap.get('msg_attrs').get('force') + '/' + maxForce);
             }
         }
     };
@@ -5156,7 +5161,7 @@ window.setTimeout(function () {
                 let retry = new Retry(300);
                 retry.initialize(function escape () {
                     ButtonManager.click('escape');
-                }, CombatStatus.justFinished);
+                }, CombatStatus.justFinished || !CombatStatus.inProgress);
 
                 await retry.fire();
 
@@ -7295,8 +7300,8 @@ window.setTimeout(function () {
             title: '点击一下吸气 3 次...',
             width: '38px',
 
-            eventOnClick () {
-                ButtonManager.click('#3 recovery');
+            async eventOnClick () {
+                await ButtonManager.click('#3 recovery');
             }
         }, {
             label: 'hp & mp',
