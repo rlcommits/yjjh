@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.120
+// @version      2.1.121
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -581,12 +581,11 @@ window.setTimeout(function () {
         }
 
         async start () {
-            await ButtonManager.click('score');
-            await ButtonManager.click('prev;enforce 0');
+            EnforceHelper.snapshotEnforce();
 
             await this.fight();
 
-            await ButtonManager.click('enforce ' + User.attributes.getMaxEnforce());
+            EnforceHelper.recoverEnforce();
         }
 
         async fight () {
@@ -5414,7 +5413,7 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    if (!System.isLocalServer() && window.confirm('当前为跨服，此开关本服跨服同时激活的情况可能会导致 5:55 的时候命令过于频繁而造成页面刷新从而本服页面被顶，确定继续打开？')) {
+                    if (!System.isLocalServer() && !window.confirm('当前为跨服，此开关本服跨服同时激活的情况可能会导致 5:55 的时候命令过于频繁而造成页面刷新从而本服页面被顶，确定继续打开？')) {
                         ButtonManager.resetButtonById(this.id);
                     } else {
                         JobRegistry.getJob(this.id).start();
