@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.118
+// @version      2.1.119
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -287,7 +287,7 @@ window.setTimeout(function () {
                 for (let i = 0; i < ids.length; i++) {
                     if (!ids[i] || ids[i].includes('-stateless')) continue;
                     if (ids[i].includes('-local-only') && !isLocal) continue;
-                        
+
                     debugging(`pressing ids[${i}]=` + ids[i]);
                     ButtonManager.pressDown(ids[i]);
                 }
@@ -6260,6 +6260,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     ButtonManager.resetButtonById('id-equipment-for-study');
+                    await ExecutionManager.wait(300);
                     await EquipmentHelper.switch2CombatMode();
                 } else {
                     await EquipmentHelper.switch2NormalMode();
@@ -6274,6 +6275,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     ButtonManager.resetButtonById('id-equipment-for-combat');
+                    await ExecutionManager.wait(300);
                     await EquipmentHelper.switch2StudyMode();
                 } else {
                     await EquipmentHelper.switch2NormalMode();
@@ -6686,7 +6688,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '自动处理',
-            title: '此开关打开时，以下战斗脚本会自动尝试连续进行...\n\n注意：\n1. 队长模式下队员无需开启此开关也会跟着打\n2. 目前版本可能会被杀气叫杀干扰不能正常工作\n3. 目前版本只支持青城孽龙、恒山、峨眉劳军、白坨军阵...',
+            title: '此开关打开时，从点青城开始以下战斗脚本会自动尝试连续进行...\n\n注意：\n1. 队长模式下队员无需开启此开关也会跟着打\n2. 目前版本可能会被杀气叫杀干扰不能正常工作\n3. 目前版本只支持青城孽龙、恒山、峨眉劳军、白坨军阵...',
             id: 'id-automated-daily-battle',
 
             eventOnClick () {
@@ -6786,6 +6788,7 @@ window.setTimeout(function () {
                     combat.initialize(Objects.Room.getAvailableNpcsV2()[0], '比试');
                     await combat.fire();
 
+                    await TeamworkHelper.Navigation.notifyTeamWithPath('回家', 'home');
                     await Navigation.move('home');
                 }
             }
