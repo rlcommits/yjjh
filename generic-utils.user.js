@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.117
+// @version      2.1.118
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -282,12 +282,14 @@ window.setTimeout(function () {
             let ids = System.getVariant(System.keys.LAST_ACTIVE_BUTTON_IDS);
             log('读取上次激活的按钮...', ids);
 
+            let isLocal = System.isLocalServer();
             if (ids && Array.isArray(ids)) {
                 for (let i = 0; i < ids.length; i++) {
-                    if (ids[i] && !ids[i].includes('-stateless')) {
-                        debugging(`ids[${i}]=` + ids[i]);
-                        ButtonManager.pressDown(ids[i]);
-                    }
+                    if (!ids[i] || ids[i].includes('-stateless')) continue;
+                    if (ids[i].includes('-local-only') && !isLocal) continue;
+                        
+                    debugging(`pressing ids[${i}]=` + ids[i]);
+                    ButtonManager.pressDown(ids[i]);
                 }
             }
 
@@ -5410,7 +5412,15 @@ window.setTimeout(function () {
             stateful: true,
 
             eventOnClick () {
-                ButtonManager.simpleToggleButtonEvent(this) ? JobRegistry.getJob(this.id).start() : JobRegistry.getJob(this.id).stop();
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    if (!System.isLocalServer() && window.confirm('当前为跨服，此开关本服跨服同时激活的情况可能会导致 5:55 的时候命令过于频繁而造成页面刷新从而本服页面被顶，确定继续打开？')) {
+                        ButtonManager.resetButtonById(this.id);
+                    } else {
+                        JobRegistry.getJob(this.id).start();
+                    }
+                } else {
+                    JobRegistry.getJob(this.id).stop();
+                }
             }
         }, {
             label: '自动打坐',
@@ -7869,8 +7879,13 @@ window.setTimeout(function () {
         HelperUiManager.drawControlCheckboxes();
         HelperUiManager.drawMasterSwitch();
 
-        ButtonManager.pressDown('id-leftover-tasks');
-        ButtonManager.pressDown('id-continue-dazuo');
+        if (System.isLocalServer()) {
+            ButtonManager.pressDown('id-leftover-tasks');
+            ButtonManager.pressDown('id-continue-dazuo');
+        } else {
+            ButtonManager.resetButtonById('id-leftover-tasks');
+        }
+
         $('#测试中功能').click();
 
         System.reloadPreviousButtonStatus();
