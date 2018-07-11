@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.124
+// @version      2.1.125
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -4021,9 +4021,7 @@ window.setTimeout(function () {
         },
 
         dragonMessageArrives (message) {
-            if (DragonHelper.isValidDragonEvent(message.get('msg'))) {
-                return true;
-            }
+            return DragonHelper.isValidDragonEvent(message.get('msg'));
         },
 
         flyToDragonPlace (message) {
@@ -4031,24 +4029,32 @@ window.setTimeout(function () {
 
             let event = DragonHelper.identifyDragonEvent(text);
             if (event) {
-                DragonMonitor._dragon = DragonHelper.parseDragonInfo(event);
+                DragonMonitor.turnOffDragonEventListener();
 
-                let regMatch = DragonMonitor.getRegKeywords();
-                let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
-                debugging('regMatch: ', regMatch);
-                debugging('regExcluded: ', regExcluded);
+                try {
+                    DragonMonitor._dragon = DragonHelper.parseDragonInfo(event);
 
-                if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
-                    DragonMonitor.turnOnDragonHandler();
+                    let regMatch = DragonMonitor.getRegKeywords();
+                    let regExcluded = DragonMonitor.getRegKeywords4ExcludedTargets();
+                    debugging('regMatch: ', regMatch);
+                    debugging('regExcluded: ', regExcluded);
 
-                    if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
-                } else {
-                    if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
-                        log('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
+                    if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
+                        DragonMonitor.turnOnDragonHandler();
+
+                        if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
                     } else {
-                        log('没有关注的目标：' + DragonMonitor._dragon.getBonus());
+                        if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
+                            log('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
+                        } else {
+                            log('没有关注的目标：' + DragonMonitor._dragon.getBonus());
+                        }
                     }
+                } catch (err) {
+                    debugging('青龙处理出错', err);
                 }
+
+                DragonMonitor.turnOnDragonEventListener();
             }
         },
 
