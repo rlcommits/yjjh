@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.125
+// @version      2.1.126
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3037,6 +3037,10 @@ window.setTimeout(function () {
 
         inProgress () {
             return $('#combat_auto_fight').html();
+        },
+
+        notInBattle () {
+            return !CombatStatus.inProgress();
         }
     };
 
@@ -4045,9 +4049,9 @@ window.setTimeout(function () {
                         if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
                     } else {
                         if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
-                            log('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
+                            debugging('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
                         } else {
-                            log('没有关注的目标：' + DragonMonitor._dragon.getBonus());
+                            debugging('没有关注的目标：' + DragonMonitor._dragon.getBonus());
                         }
                     }
                 } catch (err) {
@@ -5203,7 +5207,7 @@ window.setTimeout(function () {
                 let retry = new Retry(300);
                 retry.initialize(function escape () {
                     ButtonManager.click('escape');
-                }, CombatStatus.justFinished || !CombatStatus.inProgress);
+                }, CombatStatus.notInBattle);
 
                 await retry.fire();
 
