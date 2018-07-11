@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.126
+// @version      2.1.127
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -235,7 +235,7 @@ window.setTimeout(function () {
             MAP_FRAGMENT_THRESHOLD: 'map.fragment.threshold',
             PATH_CUSTOMIZED: 'customizations.user.path',
             EQUIPMENT_MODE: 'equipment.mode',
-            GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas',
+            GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas.quantity',
             FUGITIVE_NAMES: 'fugitive.names',
             BREAKTHROUGH_TARGET_LEVEL: 'breakthrough.target.level'
         },
@@ -3060,11 +3060,56 @@ window.setTimeout(function () {
         },
 
         getThreshold () {
-            return System.getVariant(System.keys.GANODERMAS_PURCHASE, 500);
+            return System.getVariant(System.keys.GANODERMAS_PURCHASE, '500/50');
         },
 
         setThreshold (threshold) {
             System.setVariant(System.keys.GANODERMAS_PURCHASE, threshold);
+        },
+
+        async purchase (targets = ['千年灵芝', '万年灵芝']) {
+            let itemCode = ['/map/snow/obj/qiannianlingzhi_N_10', '/map/snow/obj/wannianlingzhi_N_10'];
+
+            let quantityExpected = GanodermasPurchaseHelper.getThreshold().split('/').map(v => parseInt(v));
+            let quantityCurrent = targets.map(v => Panels.Backpack.getQuantityByItemName(v));
+            let messages = [];
+            let quantityToBuy = [];
+            let price = [1, 5];
+            let cost = [];
+
+            for (let i = 0; i < targets.length; i++) {
+                let gap = quantityExpected[i] - quantityCurrent[i];
+                if (gap <= 0) {
+                    messages.push(`无需购买${targets[i]}：预期 ${quantityExpected[i]}，当前 ${quantityCurrent[i]}`);
+                    quantityToBuy.push(0);
+                } else {
+                    messages.push(`需要购买${targets[i]} ${gap} 棵：预期 ${quantityExpected[i]}，当前 ${quantityCurrent[i]}`);
+                    quantityToBuy.push(gap);
+                    cost.push(gap * price[i]);
+                }
+            }
+
+            if (!messages.some(v => v.includes('需要购买'))) {
+                window.alert(`现在背包里已经有足够的药，不需要再购买。\n\n${messages.join('\n')}`);
+            } else {
+                if (!window.confirm(`本次需要购买如下药品，总计耗费至少银两 ${cost.reduce((a, b) => a + b)} 万，确定继续？\n\n${messages.filter(v => v.includes('需要购买')).join('\n')}`)) return;
+
+                if (Objects.Room.getName() !== '桑邻药铺') {
+                    await ButtonManager.click('jh 1;e;#3 n;w');
+                }
+
+                GanodermasPurchaseHelper.reset();
+                for (let i = 0; i < targets.length; i++) {
+                    if (quantityToBuy[i] === 0) continue;
+
+                    let buyTimes = quantityToBuy[i] / 10;
+                    for (let j = 0; j < buyTimes; j++) {
+                        if (GanodermasPurchaseHelper.isCancelled()) break;
+
+                        await ButtonManager.click(`buy ${itemCode[i]} from snow_herbalist`);
+                    }
+                }
+            }
         }
     };
 
@@ -7269,26 +7314,8 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    await ButtonManager.click('items');
-                    let currentQuantity = Panels.Backpack.getQuantityByName('千年灵芝');
-                    let quantityToBuy = GanodermasPurchaseHelper.getThreshold() - currentQuantity;
-                    if (quantityToBuy <= 0) {
-                        window.alert(`现在背包里已经有 ${currentQuantity} 棵千年灵芝，大于你设定的阈值 ${GanodermasPurchaseHelper.getThreshold()}, 所以不需要再购买。`);
-                    } else {
-                        if (window.confirm(`本次需要购买 ${quantityToBuy} 棵千年灵芝，耗费银两 ${quantityToBuy} 万，确定继续？`)) {
-                            if (Objects.Room.getName() !== '桑邻药铺') {
-                                await ButtonManager.click('jh 1;e;#3 n;w');
-                            }
-
-                            GanodermasPurchaseHelper.reset();
-                            let buyTimes = quantityToBuy / 10;
-                            for (let i = 0; i < buyTimes; i++) {
-                                if (GanodermasPurchaseHelper.isCancelled()) break;
-
-                                await ButtonManager.click(`buy /map/snow/obj/qiannianlingzhi_N_10 from snow_herbalist`);
-                            }
-                        }
-                    }
+                    await ButtonManager.click('items;prev');
+                    await GanodermasPurchaseHelper.purchase();
 
                     ButtonManager.resetButtonById(this.id);
                 } else {
@@ -7297,14 +7324,14 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '设置购买千年灵芝到多少棵为止...',
+            title: '设置购买千/万年灵芝到多少棵为止...',
             id: 'id-buy-ganodermas-setting',
             width: '10px',
 
             async eventOnClick () {
-                let answer = window.prompt('请输入购买千年灵芝的上限数值。', GanodermasPurchaseHelper.getThreshold());
+                let answer = window.prompt('请按格式输入购买结束后背包里的千年灵芝和万年灵芝的预期数值，用半角斜线分开。例如：500/50', GanodermasPurchaseHelper.getThreshold());
                 if (answer) {
-                    GanodermasPurchaseHelper.setThreshold(parseInt(answer));
+                    GanodermasPurchaseHelper.setThreshold(answer);
                 }
             }
         }, {
@@ -7351,7 +7378,7 @@ window.setTimeout(function () {
             }
         }, {
             label: 'hp & mp',
-            title: '战斗完毕自动吸气疗伤，且千年灵芝补蓝...\n\n注意：\n1. 自动吸气到满血停止\n2. 自动使用适量千年灵芝补充内力到离内力最大值不到 2000\n3. 按下即可保持自动补血补内状态',
+            title: '战斗完毕自动吸气疗伤，且千/万年灵芝补蓝...\n\n注意：\n1. 自动吸气到满血停止\n2. 内力缺口超过 3 万则优先使用万年灵芝\n3. 如在本服，脚本继续使用适量千年灵芝补充到离内力最大值不到 2000；跨服则继续使用万年灵芝\n4. 按下即可保持自动补血补内状态',
             id: 'id-recover-hp-mp',
 
             async eventOnClick () {
