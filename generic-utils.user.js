@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.127
+// @version      2.1.128
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -218,6 +218,7 @@ window.setTimeout(function () {
             FOREST_STARTPOINT_PATH_ALIAS: 'forest.startpoint.path.alias',
             FOREST_STARTPOINT_PATH: 'forest.startpoint.path',
             FOREST_TRAVERSAL_PATH: 'forest.traversal.path',
+            FOREST_INTERVAL: 'forest.interval',
             DAILY_ONEOFF_TASK_INDEX: 'daily.oneoff.task.index',
             LAST_ACTIVE_BUTTON_IDS: 'active.button.ids',
             INTERVAL_AUTO_RECONNECT: 'interval.auto.reconnect',
@@ -1955,6 +1956,7 @@ window.setTimeout(function () {
                         return;
                     }
 
+                    await ButtonManager.click('skills;prev');
                     let skillId = SkillHelper.getSkillIdByName(skillName);
                     let currentLevel = await SkillHelper.Breakthrough.getCurrentLevel(skillId);
                     let targetLevel = SkillHelper.Breakthrough.getTargetLevel(skillName);
@@ -2633,6 +2635,14 @@ window.setTimeout(function () {
     };
 
     var ForestHelper = {
+        getInterval () {
+            return System.getVariant(System.keys.FOREST_INTERVAL, 2500);
+        },
+
+        setInterval (interval) {
+            System.setVariant(System.keys.FOREST_INTERVAL, interval);
+        },
+
         getTraversalPath () {
             return System.getVariant(System.keys.FOREST_TRAVERSAL_PATH, ForestHelper.getDefaultTraversalPath());
         },
@@ -5100,6 +5110,7 @@ window.setTimeout(function () {
                 '唐门秘道': 'jh 14;w;#3 n;e;e;n;n;#3 ask tangmen_tangmei;e;event_1_8413183;event_1_39383240;e;s;e;n;w;n;n;s;s',
                 '洛阳凌中天': 'jh 2;#5 n;e;e;#4 n;e',
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
+                '云梦璃': 'jh 2;#14 n;#6 e;#14',
 
                 '冰月谷': 'jh 14;w;#4 n;event_1_32682066;#wait 1500;~寒冰之湖;#wait 1000',
 
@@ -5917,6 +5928,9 @@ window.setTimeout(function () {
                     case 7:
                         await Navigation.move(PathManager.getPathForSpecificEvent('洛阳凌中天'));
                         break;
+                    case 8:
+                        await Navigation.move(PathManager.getPathForSpecificEvent('云梦璃'));
+                        break;
                     default:
                 }
             }
@@ -6047,7 +6061,7 @@ window.setTimeout(function () {
                     }
 
                     if (window.confirm(`确定开始按如下既定路径, 自动寻找路径并叫杀 npc?\n\n${ForestHelper.getTraversalPath()}`)) {
-                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), 5000, new RegexExpressionFilter(), false, true, '', false);
+                        GenericMapCleaner.initialize(true, ForestHelper.getTraversalPath().split(';').extract(), ForestHelper.getInterval(), new RegexExpressionFilter(), false, true, '', false);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
@@ -6072,6 +6086,17 @@ window.setTimeout(function () {
                 } else {
                     window.alert('设置格式不正确，请参照例子重新设置');
                 }
+            }
+        }, {
+            label: '时间间隔',
+            title: '设置森林中战斗结束后间隔多少毫秒（补红补蓝）移动到下一步...\n\n注意：\n队长专属功能，队员可以不用设置。',
+            id: 'id-forest-killer-innterval-setting',
+
+            async eventOnClick () {
+                let answer = window.prompt('请输入森林中战斗结束后在原地停留多少毫秒（补红补蓝）再移动...\n\n例子：2500', ForestHelper.getInterval());
+                if (!parseInt(answer)) return;
+
+                ForestHelper.setInterval(answer);
             }
         }, {
         }, {
