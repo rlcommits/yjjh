@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.123
+// @version      2.1.124
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -721,7 +721,7 @@ window.setTimeout(function () {
 
         async resolve () {
             debugging('处理任务...');
-            if (this._item && Panels.Backpack.getItemQuantityByName(this._item.getName())) {
+            if (this._item && Panels.Backpack.getQuantityByName(this._item.getName())) {
                 let link = await Panels.Family.getActionLink('交任务');
                 await ExecutionManager.asyncExecute(link);
                 return;
@@ -2820,7 +2820,7 @@ window.setTimeout(function () {
     };
 
     var RecoveryHelper = {
-        _retry: new Retry(500),
+        _retry: new Retry(300),
         _stopContinualRecovery: false,
 
         setSkill (skill) {
@@ -2882,9 +2882,9 @@ window.setTimeout(function () {
                 let times = getForceGap() / 30000 + 1;
                 await ButtonManager.click(`#${times} items use snow_wannianlingzhi`);
             } else {
-                let numberOf10k = Panels.Backpack.getDrugQuantityByName('万年灵芝');
+                let numberOf10k = Panels.Backpack.getQuantityByItemName('万年灵芝');
                 debugging(`万年灵芝还剩 ${numberOf10k} 棵...`);
-                let numberOf1k = Panels.Backpack.getDrugQuantityByName('千年灵芝');
+                let numberOf1k = Panels.Backpack.getQuantityByItemName('千年灵芝');
                 debugging(`千年灵芝还剩 ${numberOf1k} 棵...`);
 
                 let gap = getForceGap();
@@ -3338,21 +3338,28 @@ window.setTimeout(function () {
                 return Panels.Backpack.getItems().filter(v => v.getName() === name);
             },
 
-            getItemQuantityByName (name = '') {
+            getQuantityByName (name = '') {
                 let records = System.globalObjectMap.get('msg_items').elements.filter(v => System.replaceControlCharBlank(v['value']).includes(`,${name},`));
                 if (records.length === 0) return 0;
 
                 return parseInt(records[0]['value'].split(',')[2]);
             },
 
-            getDrugQuantityByName (name = '') {
-                let records = System.globalObjectMap.get('msg_items').elements.filter(v => v['value'].includes(name));
+            getQuantityByItemName (name = '', inStore = false) {
+                let records = System.globalObjectMap.get('msg_items').elements.filter(function (v) {
+                    if (!inStore && !v['key'].startsWith('items')) return false;
+
+                    let props = Array.isArray(v['value']) ? v['value'].join(',') : v['value'];
+                    return System.ansiToText(props).includes(`,${name},`);
+                }).map(function (k) {
+                    let props = Array.isArray(k['value']) ? k['value'].join(',') : k['value'];
+                    return System.ansiToText(props).split(',')[2];
+                });
 
                 debugging('records', records);
                 if (records.length === 0) return 0;
 
-                let values = Array.isArray(records[0]['value']) ? records[0]['value'].join(',') : records[0]['value'];
-                return parseInt(values.split(',')[2]);
+                return parseInt(records[0]);
             }
         }
     };
@@ -4417,7 +4424,7 @@ window.setTimeout(function () {
         },
 
         async resolveDeathBookIfAny () {
-            let bookQuantity = Panels.Backpack.getItemQuantityByName('生死簿');
+            let bookQuantity = Panels.Backpack.getQuantityByName('生死簿');
             if (bookQuantity) {
                 if (Objects.Room.getName() !== '雪亭驿') await Navigation.move('jh 1;e;#4 n;w');
 
@@ -6611,7 +6618,7 @@ window.setTimeout(function () {
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     let warning = '';
-                    if (!Panels.Backpack.getItemQuantityByName('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
+                    if (!Panels.Backpack.getQuantityByName('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
                     if (Objects.Room.getName() !== '天山山脚') warning = '请先自行走到天山山脚。';
 
                     if (warning) {
@@ -7253,7 +7260,7 @@ window.setTimeout(function () {
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
                     await ButtonManager.click('items');
-                    let currentQuantity = Panels.Backpack.getItemQuantityByName('千年灵芝');
+                    let currentQuantity = Panels.Backpack.getQuantityByName('千年灵芝');
                     let quantityToBuy = GanodermasPurchaseHelper.getThreshold() - currentQuantity;
                     if (quantityToBuy <= 0) {
                         window.alert(`现在背包里已经有 ${currentQuantity} 棵千年灵芝，大于你设定的阈值 ${GanodermasPurchaseHelper.getThreshold()}, 所以不需要再购买。`);
@@ -7339,6 +7346,7 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    await ButtonManager.click('items;prev');
                     await RecoveryHelper.initializeContinualRecover();
                     await RecoveryHelper.startContinualRecovery();
                 } else {
