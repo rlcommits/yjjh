@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.129
+// @version      2.1.130
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -5407,7 +5407,7 @@ window.setTimeout(function () {
             let steps = path.split(';').extract();
 
             for (let i = 0; i < steps.length; i++) {
-                if (steps[i] === 'home' && !System.isLocalServer() && Objects.Room.getName().includes('武林广场')) {
+                if (steps[i] === 'home' && Objects.Room.getMapId() === 'kuafu') {
                     debugging('忽略回家命令：当前已经位于跨服武林广场，再执行回家命令就回到本服啦。');
                     continue;
                 } else if (steps[i].includes('#wait ')) {
