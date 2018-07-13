@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.130
+// @version      2.1.131
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -835,7 +835,7 @@ window.setTimeout(function () {
             let itemsInBackpack = EquipmentHelper.getBackpackItems();
 
             return EquipmentHelper.getCurrentSetting().split(';').map(v => v.split('/')[modeIndex]).map(function (k) {
-                let items = itemsInBackpack.filter(o => o.match(k));
+                let items = itemsInBackpack.filter(o => o.match(k) && !o.includes('suipian'));
                 if (items.length) {
                     let props = items[0].split(',');
                     return new Equipment(props[0], props[1], props[3] === '1', props[0].match('weapon|sword') ? 'wield' : 'wear');
@@ -6444,7 +6444,7 @@ window.setTimeout(function () {
             title: '设置各种模式下的装备...',
 
             async eventOnClick () {
-                let answer = window.prompt('请按顺序和格式预设战斗、学习以及普通模式武器和装备...\n\n例子：九天龙吟剑/风泉之剑/风泉之剑;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒\n\n注意：\n1. 必须是物品全名\n2. 模式间以斜线分隔，装备类型间以半角分号分隔', EquipmentHelper.getCurrentSetting());
+                let answer = window.prompt('请按顺序和格式预设战斗、学习以及普通模式武器和装备...\n\n例子：九天龙吟剑/风泉之剑/风泉之剑;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒\n\n注意：\n1. 可以只是武器装备关键字\n2. 模式间以斜线分隔，装备类型间以半角分号分隔', EquipmentHelper.getCurrentSetting());
                 if (answer) {
                     EquipmentHelper.saveNewSetting(answer);
                 }
