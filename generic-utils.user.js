@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.131
+// @version      2.1.132
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1839,6 +1839,8 @@ window.setTimeout(function () {
             },
 
             notifyTeamForMove (directionDiscription) {
+                if (directionDiscription.includes('clickButton')) return;
+
                 TeamworkHelper.teamChat(`全体注意，往${directionDiscription}走一步。`);
             },
 
@@ -3581,6 +3583,10 @@ window.setTimeout(function () {
                 return directions[Math.floor(Math.random() * directions.length)];
             },
 
+            getDirectionCodeByName (eventName) {
+                return $('button').filter(function () { return !eventName || $(this).text() === eventName; }).attr('onclick');
+            },
+
             getEventByName (eventName) {
                 return $('button').filter(function () { return !eventName || $(this).text() === eventName; }).attr('onclick');
             },
@@ -3894,7 +3900,7 @@ window.setTimeout(function () {
         },
 
         getInterval () {
-            return System.getVariant(System.keys.MAP_CLEANER_TIANJIAN_INTERVAL, 1500);
+            return System.getVariant(System.keys.MAP_CLEANER_TIANJIAN_INTERVAL, 1000);
         },
 
         setInterval (interval) {
@@ -4595,6 +4601,21 @@ window.setTimeout(function () {
         }
     };
 
+    class Palace {
+        constructor (name, path) {
+            this._name = name;
+            this._path = path;
+        }
+
+        getName () {
+            return this._name;
+        }
+
+        getPath () {
+            return this._path;
+        }
+    };
+
     var PathManager = {
         setCustomizedPath (path) {
             System.setVariant(System.keys.PATH_CUSTOMIZED, path);
@@ -4639,6 +4660,35 @@ window.setTimeout(function () {
                         return PathManager._PATHS._GENERIC_TASK._FIGHT_OR_GET[target][specificTarget];
                 }
             }
+        },
+
+        async get12PalacesPath () {
+            let targets = ['麒麟宫', '苍鹰宫', '白虎宫', '金狮宫', '凤凰宫', '银豹宫', '云兽宫', '赤龙宫', '玄武宫', '朱雀宫', '荒狼宫', '神猿宫'];
+
+            await Navigation.move('nw');
+            let palacesLeft = targets.map(function (v) {
+                let event = Objects.Room.getEventByNameReg(v);
+                if (event) {
+                    return new Palace(v, `nw;${event};~甬道;se`);
+                }
+            }).filter(k => k);
+            debugging('left', palacesLeft);
+
+            await Navigation.move('se;ne');
+            let palacesRight = targets.map(function (v) {
+                let event = Objects.Room.getEventByNameReg(v);
+                if (event) {
+                    return new Palace(v, `ne;${event};~甬道;sw`);
+                }
+            }).filter(k => k);
+            debugging('right', palacesRight);
+
+            let palaces = palacesLeft.concat(palacesRight);
+
+            await Navigation.move('sw');
+            return targets.map(function (v) {
+                return palaces.filter(k => k.getName() === v)[0].getPath();
+            }).join(';');
         },
 
         async passEmeiGate () {
@@ -5165,7 +5215,8 @@ window.setTimeout(function () {
 
                 '幽荧殿': 'clan;scene;clan fb;clan fb enter shenshousenlin;#wait 1500;~幽荧殿;#4 s;#3 w',
                 '极武坛前': 'fb 1;#wait 1000;w;s;e',
-                '极武坛扫荡': '#4 e;nw;w;nw;se;ne;nw;nw;se;se;ne;se;nw;sw;nw;e;w;ne;sw;w;e;se;ne;n;s;ne;sw;e;w;nw;se;e;w;sw;nw;n;s;sw;ne;se;ne;w;e;sw;event_1_40536215;n'
+                '旧极武坛扫荡': '#4 e;nw;w;nw;se;ne;nw;nw;se;se;ne;se;nw;sw;nw;e;w;ne;sw;w;e;se;ne;n;s;ne;sw;e;w;nw;se;e;w;sw;nw;n;s;sw;ne;se;ne;w;e;sw;event_1_40536215;n',
+                '极武坛正厅': '#4 e;nw;w;nw;se;ne;sw'
             }
         }
     };
@@ -5421,7 +5472,15 @@ window.setTimeout(function () {
                             await eval(steps[i].substr(1));
                             break;
                         default:
-                            await ExecutionManager.asyncExecute("clickButton('" + steps[i] + "')");
+                            if (steps[i].startsWith('clickButton(')) {
+                                try {
+                                    await ExecutionManager.asyncExecute(steps[i]);
+                                } catch (err) {
+                                    debugging('err', err);
+                                }
+                            } else {
+                                await ExecutionManager.asyncExecute("clickButton('" + steps[i] + "')");
+                            }
                     }
                 }
             }
@@ -6343,7 +6402,12 @@ window.setTimeout(function () {
                     }
 
                     if (window.confirm('确定开始按既定路径, 自动寻找路径并叫杀极武坛 npc?')) {
-                        GenericMapCleaner.initialize(true, PathManager.getPathForSpecificEvent('极武坛扫荡').split(';').extract(), 5000);
+                        GenericMapCleaner.initialize(true, PathManager.getPathForSpecificEvent('极武坛正厅').split(';').extract(), 1000);
+                        await GenericMapCleaner.start();
+
+                        let pathOfPalaces = await PathManager.get12PalacesPath() + ';event_1_40536215;n';
+                        debugging('path of places', pathOfPalaces);
+                        GenericMapCleaner.initialize(true, pathOfPalaces.split(';'), 1000);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
