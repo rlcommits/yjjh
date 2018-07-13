@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.128
+// @version      2.1.129
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -676,7 +676,7 @@ window.setTimeout(function () {
         async _initialize () {
             let waitingMicroSeconds = 0;
             if (CombatStatus.inProgress()) {
-                waitingMicroSeconds = 10000;
+                waitingMicroSeconds = 15000;
             } else if (this._text.includes('帮派使者：现在并没有任务，好好练功吧！')) {
                 waitingMicroSeconds = 1000;
             }
@@ -784,7 +784,7 @@ window.setTimeout(function () {
 
     var EquipmentHelper = {
         getCurrentSetting () {
-            return System.getVariant(System.keys.EQUIPMENT_MODE, '九天龙吟剑/风泉之剑/风泉之剑;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒');
+            return System.getVariant(System.keys.EQUIPMENT_MODE, '九天龙吟剑/风泉之剑/风泉之剑;天罡掌套/天罡掌套/天罡掌套;龙鳞/龙鳞/龙鳞;斩龙帽/迷幻经纶/斩龙帽;斩龙宝戒/龙渊扳指/斩龙宝戒');
         },
 
         saveNewSetting (setting) {
@@ -792,41 +792,68 @@ window.setTimeout(function () {
         },
 
         async switch2CombatMode () {
-            await EquipmentHelper._wear(0);
+            await EquipmentHelper.useEquipments(0);
         },
 
         async switch2StudyMode () {
-            await EquipmentHelper._wear(1);
+            await EquipmentHelper.useEquipments(1);
         },
 
         async switch2NormalMode () {
-            await EquipmentHelper._wear(2);
+            await EquipmentHelper.useEquipments(2);
         },
 
-        async _wear (modeIndex) {
-            let namePatternsToMatch = EquipmentHelper.getCurrentSetting().split(';').map(v => v.split('/')[modeIndex]).join('|');
-            let equipmentsToUse = System.globalObjectMap.get('msg_items').elements.filter(function (v) {
-                if (!v['key'].startsWith('items')) return false;
+        async removeSpecificEquipments () {
+            if (ButtonManager.isButtonPressed('id-equipment-for-combat')) {
+                await EquipmentHelper.unwieldWeapons(0);
+            } else if (ButtonManager.isButtonPressed('id-equipment-for-study')) {
+                await EquipmentHelper.unwieldWeapons(1);
+            } else {
+                await EquipmentHelper.unwieldWeapons(2);
+            }
+        },
 
-                let values = Array.isArray(v['value']) ? v['value'][1] : v['value'];
-                return System.ansiToText(values).match(namePatternsToMatch);
-            }).map(function (o) {
-                let values = Array.isArray(o['value']) ? o['value'].join(',') : o['value'];
-                let properties = System.ansiToText(values).split(',');
-                let action = properties[0].match('weapon|sword') ? 'wield' : 'wear';
+        async unwieldWeapons () {
+            let equipmentsInUse = EquipmentHelper.getEquipmentsInUse();
 
-                let result = new Equipment(properties[0], properties[1], properties[3] === '1', action);
-                debugging(result);
-                return result;
-            });
-
-            for (let i = 0; i < equipmentsToUse.length; i++) {
-                if (!equipmentsToUse[i].inUse()) {
-                    await ButtonManager.click(`${equipmentsToUse[i].getAction()} ${equipmentsToUse[i].getId()}`);
-                } else {
-                    debugging(`${equipmentsToUse[i].getName()}已经装备。`);
+            for (let i = 0; i < equipmentsInUse.length; i++) {
+                if (equipmentsInUse[i].getAction() === 'unwield') {
+                    await ButtonManager.click(`unwield ${equipmentsInUse[i].getId()}`);
                 }
             }
+        },
+
+        async useEquipments (modeIndex) {
+            let equipmentsToSwitch = EquipmentHelper.getEquipmentsByMode(modeIndex).filter(v => !v.inUse());
+
+            for (let i = 0; i < equipmentsToSwitch.length; i++) {
+                await ButtonManager.click(`${equipmentsToSwitch[i].getAction()} ${equipmentsToSwitch[i].getId()}`);
+            }
+        },
+
+        getEquipmentsByMode (modeIndex) {
+            let itemsInBackpack = EquipmentHelper.getBackpackItems();
+
+            return EquipmentHelper.getCurrentSetting().split(';').map(v => v.split('/')[modeIndex]).map(function (k) {
+                let items = itemsInBackpack.filter(o => o.match(k));
+                if (items.length) {
+                    let props = items[0].split(',');
+                    return new Equipment(props[0], props[1], props[3] === '1', props[0].match('weapon|sword') ? 'wield' : 'wear');
+                } else {
+                    return null;
+                }
+            }).filter(o => o);
+        },
+
+        getEquipmentsInUse () {
+            return EquipmentHelper.getBackpackItems().map(function (v) {
+                let props = System.ansiToText(v).split(',');
+                return new Equipment(props[0], props[1], props[3] === '1', props[0].match('weapon|sword') ? 'unwield' : 'remove');
+            }).filter(o => o.inUse());
+        },
+
+        getBackpackItems () {
+            return System.globalObjectMap.get('msg_items').elements.filter(v => v['key'].startsWith('items')).map(k => System.ansiToText(Array.isArray(k['value']) ? k['value'].join(',') : k['value']));
         }
     };
 
@@ -6369,11 +6396,21 @@ window.setTimeout(function () {
                     }
                 } else {
                     await ButtonManager.click('auto_equip on');
+                    await ButtonManager.click('items;prev');
+                    await EquipmentHelper.removeSpecificEquipments();
+
+                    if (ButtonManager.isButtonPressed('id-equipment-for-combat')) {
+                        await EquipmentHelper.useEquipments(0);
+                    } else if (ButtonManager.isButtonPressed('id-equipment-for-study')) {
+                        await EquipmentHelper.useEquipments(1);
+                    } else {
+                        await EquipmentHelper.useEquipments(2);
+                    }
                 }
             }
         }, {
             label: '战',
-            title: '切换武器成九天天罡龙鳞，加力且去掉自动战斗...\n\n注意\n1. 在战斗中临时切换也有效。\n2. 如背包里有 11 级武器则装备 11 级武器。',
+            title: '切换武器/装备成设定好的战斗模式...\n\n注意\n1. 在战斗中临时切换也有效\n2. 脚本按预设的武器装备顺序进行适配',
             id: 'id-equipment-for-combat',
             width: '38px',
             marginRight: '1px',
@@ -6389,7 +6426,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '学',
-            title: '切换到悟性最高的装备...\n\n1. 风泉之剑 (+10)\n2. 迷幻经纶 (+3)\n3. 龙渊扳指(+3)',
+            title: '切换到设定好的武器/装备学习模式（建议设定为以下三样）...\n\n1. 风泉之剑 (+10)\n2. 迷幻经纶 (+3)\n3. 龙渊扳指(+3)',
             width: '38px',
             id: 'id-equipment-for-study',
 
