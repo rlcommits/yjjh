@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.132
+// @version      2.1.133
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3479,9 +3479,9 @@ window.setTimeout(function () {
             },
 
             getName () {
-                if (System.globalObjectMap.get('msg_room')) return System.globalObjectMap.get('msg_room').get('short');
+                if (System.globalObjectMap.get('msg_room')) return System.ansiToText(System.globalObjectMap.get('msg_room').get('short'));
 
-                return System.globalObjectMap.get('msg_attrs').get('room_name');
+                return System.ansiToText(System.globalObjectMap.get('msg_attrs').get('room_name'));
             },
 
             getType () {
@@ -3689,22 +3689,29 @@ window.setTimeout(function () {
     };
 
     var ClanCombatHelper = {
-        async back () {
-            let roomName = Objects.Room.getName();
-            let matches = roomName.match(/武林广场(.*)/);
+        battlefields: ['至尊殿', '翰海楼', '八荒谷', '九州城', '怒蛟泽', '凌云峰', '江左营', '虎啸林', '青云山', '论剑堂'],
 
+        async back () {
+            if (Objects.Room.getMapId() !== 'kuafu') await Navigation.move("home");
+
+            if (Objects.Room.getName().includes('阁')) await Navigation.move(Objects.Room.getEventByNameReg('[^阁]'));
+            if (ClanCombatHelper.battlefields.includes(Objects.Room.getName())) await Navigation.move('n');
+            
+            let matches = Objects.Room.getName().match(/武林广场(.*)/);
             let numberOfSteps = parseInt(matches[1]) - 1;
             if (numberOfSteps) {
                 await Navigation.move(`#${numberOfSteps} w`);
             }
 
-            let steps = ClanCombatHelper.getBattlePlace().split('-');
-            await Navigation.travelsalWithEvent('武林广场走一遍', function findRightPlace () {
-                return Objects.Room.getEventByName(steps[0]);
-            });
+            let place = ClanCombatHelper.getBattlePlace().split('-');
+            if (!Objects.Room.getEventByName(place[0])) {
+                await Navigation.travelsalWithEvent('武林广场走一遍', function findRightPlace () {
+                    return Objects.Room.getEventByName(place[0]);
+                });
+            }
 
-            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[0]));
-            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(steps[1]));
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(place[0]));
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(place[1]));
         },
 
         setBattlePlace (battlePlace) {
@@ -6407,7 +6414,7 @@ window.setTimeout(function () {
 
                         let pathOfPalaces = await PathManager.get12PalacesPath() + ';event_1_40536215;n';
                         debugging('path of places', pathOfPalaces);
-                        GenericMapCleaner.initialize(true, pathOfPalaces.split(';'), 1000);
+                        GenericMapCleaner.initialize(true, pathOfPalaces.split(';'), 2000);
                         await GenericMapCleaner.start();
                     } else {
                         ButtonManager.resetButtonById(this.id);
