@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.133
+// @version      2.1.134
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2649,7 +2649,7 @@ window.setTimeout(function () {
             let message = Panels.Notices.getLastMessage();
 
             if (message.match(FishingManager._REG_NO_ROD) || message.match(FishingManager._REG_NO_BAIT)) {
-                ButtonManager.click('#5 shop money_buy shop5_N_10;#5 shop money_buy shop6_N_10;diaoyu');
+                ButtonManager.click('shop money_buy mny_shop5_N_10;shop money_buy mny_shop6_N_10;diaoyu');
             } else if (message.match(FishingManager._REG_FISH_OVER)) {
                 FishingManager.stopFishing();
                 ButtonManager.resetButtonById('id-fishing');
@@ -3692,11 +3692,11 @@ window.setTimeout(function () {
         battlefields: ['至尊殿', '翰海楼', '八荒谷', '九州城', '怒蛟泽', '凌云峰', '江左营', '虎啸林', '青云山', '论剑堂'],
 
         async back () {
-            if (Objects.Room.getMapId() !== 'kuafu') await Navigation.move("home");
+            if (Objects.Room.getMapId() !== 'kuafu') await Navigation.move('home');
 
             if (Objects.Room.getName().includes('阁')) await Navigation.move(Objects.Room.getEventByNameReg('[^阁]'));
             if (ClanCombatHelper.battlefields.includes(Objects.Room.getName())) await Navigation.move('n');
-            
+
             let matches = Objects.Room.getName().match(/武林广场(.*)/);
             let numberOfSteps = parseInt(matches[1]) - 1;
             if (numberOfSteps) {
@@ -6293,6 +6293,41 @@ window.setTimeout(function () {
                     } else {
                         ClanCombatHelper.setBattlePlace(answer);
                     }
+                }
+            }
+        }, {
+            label: '攻',
+            title: '设置帮战挂了回战场的目标地点...',
+            id: 'id-gan-fight-attack',
+            width: '38px',
+            marginRight: '1px',
+            hidden: true,
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    DragonMonitor.setKillBadPerson(false);
+                    ButtonManager.resetButtonById('id-gan-fight-defend');
+
+                    DragonMonitor.turnOnDragonEventListener();
+                } else {
+                    DragonMonitor.turnOffDragonEventListener();
+                }
+            }
+        }, {
+            label: '守',
+            title: '实时监控面板，有特定青龙出现抢杀坏人...',
+            id: 'id-gan-fight-defend',
+            width: '38px',
+            hidden: true,
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    DragonMonitor.setKillBadPerson(true);
+                    ButtonManager.resetButtonById('id-gan-fight-attack');
+
+                    DragonMonitor.turnOnDragonEventListener();
+                } else {
+                    DragonMonitor.turnOffDragonEventListener();
                 }
             }
         }, {
