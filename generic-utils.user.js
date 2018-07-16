@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.135
+// @version      2.1.136
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2917,12 +2917,17 @@ window.setTimeout(function () {
         },
 
         async recoverForce () {
+            let numberOf10k = Panels.Backpack.getQuantityByItemName('万年灵芝');
+            debugging(`万年灵芝还剩 ${numberOf10k} 棵...`);
+
             if (!System.isLocalServer()) {
                 let times = getForceGap() / 30000 + 1;
-                await ButtonManager.click(`#${times} items use snow_wannianlingzhi`);
+                if (numberOf10k >= times) {
+                    await ButtonManager.click(`#${times} items use snow_wannianlingzhi`);
+                } else {
+                    await ButtonManager.click(`#${times * 6} items use snow_qiannianlingzhi`);
+                }
             } else {
-                let numberOf10k = Panels.Backpack.getQuantityByItemName('万年灵芝');
-                debugging(`万年灵芝还剩 ${numberOf10k} 棵...`);
                 let numberOf1k = Panels.Backpack.getQuantityByItemName('千年灵芝');
                 debugging(`千年灵芝还剩 ${numberOf1k} 棵...`);
 
@@ -6269,7 +6274,7 @@ window.setTimeout(function () {
 
             async eventOnClick () {
                 if (System.isLocalServer()) {
-                    window.alert('跨服专用功能，本服不适用');
+                    window.alert('跨服专用功能，本服不适用。');
                     return;
                 }
 
@@ -6297,7 +6302,7 @@ window.setTimeout(function () {
             }
         }, {
             label: '攻',
-            title: '设置帮战挂了回战场的目标地点...',
+            title: '打开此开关则玩家回到帮战战场后自动开始尝试作为攻打方重新加入战斗...',
             id: 'id-gan-fight-attack',
             width: '38px',
             marginRight: '1px',
@@ -6305,30 +6310,30 @@ window.setTimeout(function () {
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    DragonMonitor.setKillBadPerson(false);
                     ButtonManager.resetButtonById('id-gan-fight-defend');
-
-                    DragonMonitor.turnOnDragonEventListener();
                 } else {
-                    DragonMonitor.turnOffDragonEventListener();
                 }
             }
         }, {
             label: '守',
-            title: '实时监控面板，有特定青龙出现抢杀坏人...',
+            title: '打开此开关则玩家回到帮战战场后自动开始尝试作为防守方重新加入战斗...',
             id: 'id-gan-fight-defend',
             width: '38px',
             hidden: true,
 
             eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    DragonMonitor.setKillBadPerson(true);
                     ButtonManager.resetButtonById('id-gan-fight-attack');
-
-                    DragonMonitor.turnOnDragonEventListener();
                 } else {
-                    DragonMonitor.turnOffDragonEventListener();
                 }
+            }
+        }, {
+            label: '设定',
+            title: '设定帮战自动化细节...',
+            id: 'id-gan-fight-setting',
+            hidden: true,
+
+            eventOnClick () {
             }
         }, {
         }, {
