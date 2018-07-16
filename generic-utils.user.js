@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.136
+// @version      2.1.137
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -1098,7 +1098,7 @@ window.setTimeout(function () {
             index: 7,
             item: '商城购买',
             action: async function () {
-                await ButtonManager.click('shop money_buy shop1_N_10');
+                await ButtonManager.click('shop money_buy mny_shop1_N_10');
             },
             todo: true
         }, {
@@ -5705,7 +5705,7 @@ window.setTimeout(function () {
             width: '10px',
 
             async eventOnClick () {
-                let answer = window.prompt('请按格式输入要自动突破的技能和目标等级，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
+                let answer = window.prompt('请按格式输入要自动突破的技能、目标等级以及自动突破完恢复到哪个技能方案，例子：九阴白骨爪=14,乾坤大挪移=15;恢复技能=3\n\n注意：\n1. 必须是技能全称加等号加目标等级\n2. 多个技能之间以半角逗号隔开', SkillHelper.Breakthrough.getConfiguration());
                 if (answer || answer === '') {
                     SkillHelper.Breakthrough.setConfiguration(answer);
                 }
