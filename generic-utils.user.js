@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.134
+// @version      2.1.135
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -2845,8 +2845,8 @@ window.setTimeout(function () {
                 } else {
                     await ExecutionManager.wait(4500);
                     if (message.includes('炼药需要毒琥珀和毒藤胶，你还没有药材。')) {
-                        await ButtonManager.click('shop money_buy shop9_N_10');
-                        await ButtonManager.click('shop money_buy shop10_N_10');
+                        await ButtonManager.click('shop money_buy mny_shop9_N_10');
+                        await ButtonManager.click('shop money_buy mny_shop10_N_10');
                         return retry();
                     } else {
                         await ButtonManager.click('lianyao');
