@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖-帮战助手
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
