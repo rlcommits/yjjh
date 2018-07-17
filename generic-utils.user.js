@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.137
+// @version      2.1.138
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -82,16 +82,15 @@ window.setTimeout(function () {
 
         register (interceptor) {
             if (this._interceptors.includes(interceptor)) {
-                log('拦截器已经存在，不再重复注册：' + interceptor.getAlias());
-                return;
+                log(`Duplicate interceptor skipped: ${interceptor.getAlias()}`);
+            } else {
+                log(`New interceptor registered: ${interceptor.getAlias()}`);
+                this._interceptors.push(interceptor);
             }
-
-            log('注册拦截器：' + interceptor.getAlias());
-            this._interceptors.push(interceptor);
         },
 
         unregister (alias) {
-            log('注销拦截器：' + alias);
+            log(`Interceptor unregistered: ${alias}`);
             this._interceptors.splice(this._interceptors.indexOf(this._interceptors.find(v => v.getAlias() === alias)), 1);
         },
 
@@ -123,7 +122,7 @@ window.setTimeout(function () {
 
         handle (message) {
             if (this._criterial(message)) {
-                debugging(`拦截器'${this._alias}'被触发...`);
+                debugging(`Interceptor ${this._alias} triggered...`);
 
                 this._behavior(message);
                 return true;
@@ -318,7 +317,7 @@ window.setTimeout(function () {
         async initialize () {
             await ButtonManager.click('items;skills;team;friend;score;#5 prev');
 
-            User._areaRange = analyseAreaRange(User.getArea());
+            User._areaRange = identifyAreaRange(User.getArea());
 
             await analyseEnforce();
             await Objects.Room.refresh();
@@ -334,7 +333,7 @@ window.setTimeout(function () {
                 }
             }
 
-            function analyseAreaRange (area) {
+            function identifyAreaRange (area) {
                 for (let start = 1, end = 5; start < 500; start += 5, end += 5) {
                     if (area >= start && area <= end) {
                         return start + '-' + end;
@@ -2726,7 +2725,19 @@ window.setTimeout(function () {
         '翻云刀法': 3,
         '万流归一': 3,
         '幽影幻虚步': 3,
-        '生生造化功': 3
+        '生生造化功': 3,
+        '玄天杖法': 3,
+        '昊云破周斧': 3,
+        '燎原百破': 3,
+        '天火飞锤': 3,
+        '十怒绞龙索': 3,
+        '四海断潮斩': 3,
+        '九溪断月枪': 3,
+        '千影百伤棍': 3,
+        '辉月杖法': 3,
+        '玄胤天雷': 3,
+        '破军棍诀': 3,
+        '拈花解语鞭': 3
     };
 
     class BufferCalculator {
@@ -3139,7 +3150,7 @@ window.setTimeout(function () {
                 if (!window.confirm(`本次需要购买如下药品，总计耗费至少银两 ${cost.reduce((a, b) => a + b)} 万，确定继续？\n\n${messages.filter(v => v.includes('需要购买')).join('\n')}`)) return;
 
                 if (Objects.Room.getName() !== '桑邻药铺') {
-                    await ButtonManager.click('jh 1;e;#3 n;w');
+                    await Navigation.move('jh 1;e;#3 n;w');
                 }
 
                 GanodermasPurchaseHelper.reset();
@@ -3348,49 +3359,6 @@ window.setTimeout(function () {
         Family: {
             getActionLink (regKeyword) {
                 return $('.cmd_click2').filter(function () { return $(this).text().match(regKeyword); }).last().attr('onclick');
-            }
-        },
-
-        Skills: {
-            group: ['my_skills attack', 'my_skills recovery', 'my_skills force', 'my_skills known'],
-            defaultSkills: ['enableskill enable parry iron-sword'],
-
-            async findCurrentSkillIds () {
-                await ButtonManager.click('enable');
-
-                SkillManager.oldSkillIds = ['parry iron-sword'];
-            },
-
-            async findSkillIdByStatus (status) {
-                for (let i = 0; i < Panels.Skills.group.length; i++) {
-                    await ButtonManager.click(Panels.Skills.group[i]);
-
-                    let findStatus = $('span .out2:contains(' + status + ')');
-                    if (findStatus.length) {
-                        SkillManager.newSkillId = findStatus.parent().parent().attr('onclick').match(".*?skills info .*? (.*)'\\)")[1];
-                        break;
-                    }
-                }
-            },
-
-            async findSkillIdByName (name) {
-                for (let i = 0; i < Panels.Skills.group.length; i++) {
-                    await ButtonManager.click(Panels.Skills.group[i]);
-
-                    let findStatus = $('span .out3:contains(' + name + ')');
-                    if (findStatus.length) {
-                        SkillManager.newSkillId = findStatus.parent().parent().attr('onclick').match(".*?skills info .*? (.*)'\\)")[1];
-                        break;
-                    }
-                }
-            },
-
-            getCurrentTupoLevel (name) {
-
-            },
-
-            getTargetTupoLevel (name) {
-
             }
         },
 
@@ -3697,7 +3665,7 @@ window.setTimeout(function () {
         battlefields: ['至尊殿', '翰海楼', '八荒谷', '九州城', '怒蛟泽', '凌云峰', '江左营', '虎啸林', '青云山', '论剑堂'],
 
         async back () {
-            if (Objects.Room.getMapId() !== 'kuafu') await Navigation.move('home');
+            if (Objects.Room.getMapId() && Objects.Room.getMapId() !== 'kuafu') await Navigation.move('home');
 
             if (Objects.Room.getName().includes('阁')) await Navigation.move(Objects.Room.getEventByNameReg('[^阁]'));
             if (ClanCombatHelper.battlefields.includes(Objects.Room.getName())) await Navigation.move('n');
@@ -3932,70 +3900,8 @@ window.setTimeout(function () {
         oldSkillIds: [],
         newSkillId: 0,
 
-        async restartPractice () {
-            await Panels.Skills.findCurrentSkillIds();
-
-            await Panels.Skills.findSkillIdByStatus('练习中');
-            if (!SkillManager.newSkillId) {
-                let answer = window.prompt('没有检查到任何技能在练习中。请指定需要练习的技能名字？');
-                if (!answer) return;
-
-                debugging('answer=' + answer);
-                await Panels.Skills.findSkillIdByName(answer);
-                if (!SkillManager.newSkillId) {
-                    debugging('Skill ' + answer + " doesn't exist. Action cancelled.");
-                    return;
-                }
-            }
-
-            ButtonManager.click('practice stop;enable ' + SkillManager.newSkillId + ';practice ' + SkillManager.newSkillId);
-        },
-
         reEnableSkills: async function (template = 1) {
             await ButtonManager.click('enable mapped_skills restore go ' + template);
-        },
-
-        prepareAttackSkills: function (choice) {
-            let commands = [];
-
-            switch (parseInt(choice)) {
-                case 1:
-                    commands = [
-                        'enableskill enable tao-mieshen-sword',
-                        'enableskill enable tao-mieshen-sword attack_select',
-                        'enableskill enable parry iron-sword'
-                    ].join(';');
-                    break;
-                case 2:
-                    commands = [
-                        'enableskill enable tao-mieshen-sword',
-                        'enableskill enable tao-mieshen-sword no_attack_select',
-                        'enableskill enable parry iron-sword'
-                    ].join(';');
-                    break;
-                case 3:
-                    commands = [
-                        'enableskill enable force necromancy',
-                        'enableskill enable necromancy attack_select',
-                        'enableskill enable force bahuang-gong'
-                    ].join(';');
-                    break;
-                case 4:
-                    commands = [
-                        'enableskill enable force necromancy',
-                        'enableskill enable necromancy no_attack_select',
-                        'enableskill enable force bahuang-gong'
-                    ].join(';');
-                    break;
-                case 5:
-                    commands = 'enableskill enable qiankun-danuoyi attack_select';
-                    break;
-                case 6:
-                    commands = 'enableskill enable qiankun-danuoyi no_attack_select';
-                    break;
-            }
-
-            ButtonManager.click(commands, 500);
         }
     };
 
@@ -5199,7 +5105,7 @@ window.setTimeout(function () {
                 '唐门秘道': 'jh 14;w;#3 n;e;e;n;n;#3 ask tangmen_tangmei;e;event_1_8413183;event_1_39383240;e;s;e;n;w;n;n;s;s',
                 '洛阳凌中天': 'jh 2;#5 n;e;e;#4 n;e',
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
-                '云梦璃': 'jh 2;#14 n;#6 e;#14',
+                '云梦璃': 'jh 2;#15 n;#6 e;#14 n',
 
                 '冰月谷': 'jh 14;w;#4 n;event_1_32682066;#wait 1500;~寒冰之湖;#wait 1000',
 
@@ -5768,18 +5674,6 @@ window.setTimeout(function () {
                 }
             }
         }, {
-            label: '交',
-            title: '设置是否监测开地图事件且第一时间交碎片...',
-            id: 'id-map-fragments-auto-delivery',
-            width: '38px',
-            marginRight: '1px',
-            hidden: true,
-
-            eventOnClick () {
-
-            }
-        }, {
-        }, {
             label: '一直重复',
             title: '点下按钮会一直重复某个动作...\n\n提示：必须在人物或物品的命令界面才能执行。可用于 ab 场景。',
             id: 'id-repeater-stateless',
@@ -5990,7 +5884,7 @@ window.setTimeout(function () {
             title: '按提示走到选项对应的地点...',
 
             async eventOnClick () {
-                let question = '请选择要去的地点？\n\n1. 乔阴骆云舟\n2. 唐门秘道\n3. 星宿铁尸\n4. 天山大漠石室（由胡兵处出发）\n5. 西安天策秦王\n6. 杭界山\n7. 洛阳凌中天';
+                let question = '请选择要去的地点？\n\n1. 乔阴骆云舟\n2. 唐门秘道\n3. 星宿铁尸\n4. 天山大漠石室（由胡兵处出发）\n5. 西安天策秦王\n6. 杭界山\n7. 洛阳凌中天\n8. 云梦璃';
                 let choice = window.prompt(question, 1);
                 switch (parseInt(choice)) {
                     case 1:
@@ -6267,7 +6161,7 @@ window.setTimeout(function () {
         }, {
         }, {
             label: '回帮战',
-            title: '帮战挂了自动一键由任意武林广场走回战场...',
+            title: '帮战挂了自动一键由跨服任意处回到战场...',
             id: 'id-gan-fight-back',
             width: '60px',
             marginRight: '1px',
@@ -8078,14 +7972,14 @@ window.setTimeout(function () {
             let div = HelperUiManager.drawDiv('generic-control-panel', new ElementStyle('', '20px', '0px', '50px', '', 'absolute', 'right', 'white', ''));
             let subjects = HelperUiManager.getGroups().map(v => v.getSubject()).reverse();
 
-            addCheckBox(div, '全选', '', '全选所有分组', function () {
+            addCheckBox(div, '全选', '全选所有分组', function () {
                 $('#generic-control-panel').find('input[type=checkbox]').filter(function () { return $(this).attr('id') !== '全选'; }).prop('checked', this.checked);
                 $('div').filter(function () { return subjects.includes($(this).attr('id')); }).prop('hidden', !this.checked);
                 HelperUiManager.refreshDivs();
             });
 
             subjects.forEach(function (subject) {
-                addCheckBox(div, subject, '', '显示/隐藏 ' + subject + ' 对应的按钮组', function () {
+                addCheckBox(div, subject, '显示/隐藏 ' + subject + ' 对应的按钮组', function () {
                     $('div').filter(function () { return $(this).attr('id') === subject; }).prop('hidden', !this.checked);
                     refreshAllCheckedStatus(this.checked);
                     HelperUiManager.refreshDivs();
@@ -8104,7 +7998,7 @@ window.setTimeout(function () {
                 }
             }
 
-            function addCheckBox (div, label, toggleLabel, title, eventOnChange) {
+            function addCheckBox (div, label, title, eventOnChange) {
                 let checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = checkbox.id = label;
