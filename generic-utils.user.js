@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.138
+// @version      2.1.139
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -3666,25 +3666,18 @@ window.setTimeout(function () {
 
         async back () {
             if (Objects.Room.getMapId() && Objects.Room.getMapId() !== 'kuafu') await Navigation.move('home');
+            if (/^[天地玄黄龙]阁$/.test(Objects.Room.getName())) await Navigation.move(Objects.Room.getEventByNameReg('[^阁]'));
+            if (this.battlefields.includes(Objects.Room.getName())) await Navigation.move('n');
 
-            if (Objects.Room.getName().includes('阁')) await Navigation.move(Objects.Room.getEventByNameReg('[^阁]'));
-            if (ClanCombatHelper.battlefields.includes(Objects.Room.getName())) await Navigation.move('n');
-
-            let matches = Objects.Room.getName().match(/武林广场(.*)/);
-            let numberOfSteps = parseInt(matches[1]) - 1;
-            if (numberOfSteps) {
-                await Navigation.move(`#${numberOfSteps} w`);
+            let currentX = parseInt(Objects.Room.getName().match(/武林广场(.*)/)[1]) - 1;
+            let target = this.getBattlePlace().split('-');
+            let targetX = this.battlefields.indexOf(target[0]);
+            if (currentX !== targetX) {
+                await Navigation.move(currentX < targetX ? `#${targetX - currentX} e` : `#${currentX - targetX} w`);
             }
 
-            let place = ClanCombatHelper.getBattlePlace().split('-');
-            if (!Objects.Room.getEventByName(place[0])) {
-                await Navigation.travelsalWithEvent('武林广场走一遍', function findRightPlace () {
-                    return Objects.Room.getEventByName(place[0]);
-                });
-            }
-
-            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(place[0]));
-            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(place[1]));
+            await Navigation.move('s');
+            await ExecutionManager.asyncExecute(Objects.Room.getEventByName(target[1]));
         },
 
         setBattlePlace (battlePlace) {
@@ -4645,9 +4638,7 @@ window.setTimeout(function () {
                 '古墓': 'jh 20;w;w;s;e;#5 s;sw;sw;s;s;e;w;#4 s',
                 '白驼山': 'jh 21;#4 n;#4 s;nw;s;n;w;n;s;w;nw;e;w;nw;nw;n;w;sw;jh 21;nw;w;w;nw;n;e;w;n;n;w;e;n;n;e;e;w;ne;sw;e;se;nw;w;n;s;s;n;w;w;#4 n;#3 s;#4 e;n;n;e;e;w;w;w;e;n;nw;se;ne;e;w;n;jh 21;nw;ne;ne;sw;n;n;ne;w;e;n;n;w;w',
                 '碧海山庄': 'jh 38;n;n;w;e;n;n;w;w;e;e;#3 n;w;w;nw;w;e;se;e;e;n;n;e;se;s;e;w;n;nw;w;n;n;e;e;se;se;e;#3 n;#3 s',
-                '绝情谷': 'jh 37;n;e;e;nw;nw;w;n;e;n;#3 e;#3 ne;se;n;ne;sw;#3 s;w;w;s',
-
-                '武林广场走一遍': '#9 e'
+                '绝情谷': 'jh 37;n;e;e;nw;nw;w;n;e;n;#3 e;#3 ne;se;n;ne;sw;#3 s;w;w;s'
             },
 
             NPC: {
