@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.140
+// @version      2.1.141
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -507,25 +507,25 @@ window.setTimeout(function () {
     var TianshanDailyHelper = {
         _stop: false,
         _monitor: 0,
-        _autoHome: false,
+        _autoHome: true,
 
         async start () {
             TianshanDailyHelper._stop = false;
 
             await Navigation.move('ne;nw;event_1_58460791');
 
+            await retry();
+
             if (TianshanDailyHelper._autoHome) {
                 InterceptorRegistry.register(new Interceptor('天山玄冰结束检查', function done (message) {
                     return System.ansiToText(message.get('msg')) === '你已在此打坐许久，再继续下去全身经脉恐怕要被被极寒冻断。你只能离开了千年玄冰。';
-                }), async function goHome () {
+                }, async function goHome () {
                     log('天山玄冰结束。');
                     await Navigation.move('home');
-                }, 'main_msg');
+
+                    InterceptorRegistry.unregister('天山玄冰结束检查');
+                }, 'main_msg'));
             }
-
-            await retry();
-
-            if (InterceptorRegistry.getInterceptor('天山玄冰结束检查')) InterceptorRegistry.unregister('天山玄冰结束检查');
 
             async function retry () {
                 if (TianshanDailyHelper._stop) return true;
@@ -5170,7 +5170,11 @@ window.setTimeout(function () {
             },
 
             OTHER: {
-                '长安天策秦王': 'jh 2;#20 n;#4 w;#8 n',
+                '天策府议事厅': 'jh 2;#20 n;#4 w;#8 n',
+                '凌烟阁': 'jh 2;#15 n;#6 e;#14 n',
+                '金光门': 'jh 2;#15 n;#6 w;#6 n',
+                '狼居胥楼': 'jh 2;#15 n;#6 w;#13 n',
+
                 '天山胡兵到石室': 'sw;n;nw;e;sw;w;s;w;n;w;event_1_69872740;event_1_18663573',
                 '星宿射鸟': 'jh 28;n;#6 w;nw;ne;nw;ne;nw;ne;e',
                 '杭界山': 'jh 2;n;n;e;s;luoyang317_op1;go_hjs go;se;se;ne;w;n;ne',
@@ -5178,7 +5182,6 @@ window.setTimeout(function () {
                 '唐门秘道': 'jh 14;w;#3 n;e;e;n;n;#3 ask tangmen_tangmei;e;event_1_8413183;event_1_39383240;e;s;e;n;w;n;n;s;s',
                 '洛阳凌中天': 'jh 2;#5 n;e;e;#4 n;e',
                 '骆云舟': 'jh 7;#8 s;e;n;e;s;e',
-                '云梦璃': 'jh 2;#15 n;#6 e;#14 n',
 
                 '冰月谷': 'jh 14;w;#4 n;event_1_32682066;#wait 1500;~寒冰之湖;#wait 1000',
 
@@ -5917,6 +5920,29 @@ window.setTimeout(function () {
             }
         }, {
         }, {
+            label: '西安...',
+            title: '按提示走到西安城各个对应的地点...',
+
+            async eventOnClick () {
+                let question = '请选择要去的西安具体地点？\n\n1.天策府议事厅（秦王/程知节）\n2. 凌烟阁（云梦璃/李贺）\n3. 金光门（血手天魔）\n4. 狼居胥楼（霍去病）';
+                let choice = window.prompt(question, 1);
+                switch (parseInt(choice)) {
+                    case 1:
+                        await Navigation.move(PathManager.getPathForSpecificEvent('天策府议事厅'));
+                        break;
+                    case 2:
+                        await Navigation.move(PathManager.getPathForSpecificEvent('凌烟阁'));
+                        break;
+                    case 3:
+                        await Navigation.move(PathManager.getPathForSpecificEvent('金光门'));
+                        break;
+                    case 4:
+                        await Navigation.move(PathManager.getPathForSpecificEvent('狼居胥楼'));
+                        break;
+                    default:
+                }
+            }
+        }, {
             label: '九老洞',
             title: '一键到九老洞',
             id: 'id-goto-night-old-cave',
@@ -5957,7 +5983,7 @@ window.setTimeout(function () {
             title: '按提示走到选项对应的地点...',
 
             async eventOnClick () {
-                let question = '请选择要去的地点？\n\n1. 乔阴骆云舟\n2. 唐门秘道\n3. 星宿铁尸\n4. 天山大漠石室（由胡兵处出发）\n5. 西安天策秦王\n6. 杭界山\n7. 洛阳凌中天\n8. 云梦璃';
+                let question = '请选择要去的地点？\n\n1. 乔阴骆云舟\n2. 唐门秘道\n3. 星宿铁尸\n4. 天山大漠石室（由胡兵处出发）\n5. 杭界山\n6. 洛阳凌中天';
                 let choice = window.prompt(question, 1);
                 switch (parseInt(choice)) {
                     case 1:
@@ -5981,20 +6007,12 @@ window.setTimeout(function () {
 
                         break;
                     case 5:
-                        if (window.confirm('确定走到秦王处？')) {
-                            Navigation.move(PathManager.getPathForSpecificEvent('长安天策秦王'));
-                        }
-                        break;
-                    case 6:
                         if (window.confirm('确定花一个金锭到杭界山？')) {
                             Navigation.move(PathManager.getPathForSpecificEvent('杭界山'));
                         }
                         break;
-                    case 7:
+                    case 6:
                         await Navigation.move(PathManager.getPathForSpecificEvent('洛阳凌中天'));
-                        break;
-                    case 8:
-                        await Navigation.move(PathManager.getPathForSpecificEvent('云梦璃'));
                         break;
                     default:
                 }
