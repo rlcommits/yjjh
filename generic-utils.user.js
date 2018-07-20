@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.139
+// @version      2.1.140
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -96,6 +96,10 @@ window.setTimeout(function () {
 
         getInterceptors (type, subtype) {
             return this._interceptors.filter(v => (!type || v.getType() === type) && (!subtype || v.getSubtype() === subtype));
+        },
+
+        getInterceptor (alias) {
+            return this._interceptors.filter(v => v.getAlias() === alias).shift();
         }
     };
 
@@ -237,7 +241,8 @@ window.setTimeout(function () {
             EQUIPMENT_MODE: 'equipment.mode',
             GANODERMAS_PURCHASE: 'threshold.purchase.ganodermas.quantity',
             FUGITIVE_NAMES: 'fugitive.names',
-            BREAKTHROUGH_TARGET_LEVEL: 'breakthrough.target.level'
+            BREAKTHROUGH_TARGET_LEVEL: 'breakthrough.target.level',
+            FUGITIVE_SMART_RULE: 'fugitive.smart.rule'
         },
 
         logCurrentSettings () {
@@ -502,14 +507,25 @@ window.setTimeout(function () {
     var TianshanDailyHelper = {
         _stop: false,
         _monitor: 0,
+        _autoHome: false,
 
         async start () {
             TianshanDailyHelper._stop = false;
 
             await Navigation.move('ne;nw;event_1_58460791');
 
+            if (TianshanDailyHelper._autoHome) {
+                InterceptorRegistry.register(new Interceptor('天山玄冰结束检查', function done (message) {
+                    return System.ansiToText(message.get('msg')) === '你已在此打坐许久，再继续下去全身经脉恐怕要被被极寒冻断。你只能离开了千年玄冰。';
+                }), async function goHome () {
+                    log('天山玄冰结束。');
+                    await Navigation.move('home');
+                }, 'main_msg');
+            }
+
             await retry();
-            debugging('done');
+
+            if (InterceptorRegistry.getInterceptor('天山玄冰结束检查')) InterceptorRegistry.unregister('天山玄冰结束检查');
 
             async function retry () {
                 if (TianshanDailyHelper._stop) return true;
@@ -1450,13 +1466,13 @@ window.setTimeout(function () {
             async function sellSpecificItem (item = new Item()) {
                 let numberInBatch = item.getQuantity() >= 100 ? 100 : (item.getQuantity() >= 50 ? 50 : (item.getQuantity() >= 10 ? 10 : 0));
                 if (numberInBatch) {
-                    await ButtonManager.click(`items sell ${item.getId()}_N_${numberInBatch}`);
+                    await ButtonManager.click(`items sell ${item.getId()}_N_${numberInBatch}`, 300);
                     log(`${item.getName()} 已卖，数量 ${numberInBatch}`);
                     item.setQuantity(item.getQuantity() - numberInBatch);
 
                     await sellSpecificItem(item);
                 } else if (item.getQuantity()) {
-                    await ButtonManager.click(`#${item.getQuantity()} items sell ${item.getId()}`);
+                    await ButtonManager.click(`#${item.getQuantity()} items sell ${item.getId()}`, 300);
                     log(`${item.getName()} 已卖，数量 ${item.getQuantity()}`);
                 }
             }
@@ -1495,14 +1511,14 @@ window.setTimeout(function () {
 
         async split (items = []) {
             for (let i = 0; i < items.length; i++) {
-                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`);
+                await ButtonManager.click(`#${items[i].getQuantity()} items splite ${items[i].getId()}`, 300);
                 log(`${items[i].getName()} 已分解，数量 ${items[i].getQuantity()}`);
             }
         },
 
         async store (items = []) {
             for (let i = 0; i < items.length; i++) {
-                await ButtonManager.click(`items put_store ${items[i].getId()}`);
+                await ButtonManager.click(`items put_store ${items[i].getId()}`, 300);
                 log(`${items[i].getName()} 已放仓库，数量 ${items[i].getQuantity()}`);
             }
         },
@@ -1512,9 +1528,9 @@ window.setTimeout(function () {
                 if (items[i].getQuantity() > 50) {
                     let item = Panels.Backpack.getItemsByName(items[i].getName())[0];
                     await ButtonManager.click(`items info ${item.getId()}`);
-                    await ButtonManager.click('use_all', 180);
+                    await ButtonManager.click('use_all', 300);
                 } else {
-                    await ButtonManager.click(`#${items[i].getQuantity()} items use ${items[i].getId()}`);
+                    await ButtonManager.click(`#${items[i].getQuantity()} items use ${items[i].getId()}`, 300);
                 }
 
                 log(`${items[i].getName()} 已使用，数量 ${items[i].getQuantity()}`);
@@ -1914,12 +1930,78 @@ window.setTimeout(function () {
     };
 
     var FugitiveManager = {
+        _killAny: false,
+        _killGoodPerson: false,
+        _killBadPerson: false,
+        _retry: new Retry(),
+
+        async handle (matches) {
+            let combat = new Combat();
+
+            if (FugitiveManager.getKillGoodPerson()) {
+                combat.initialize(FugitiveManager.getKillGoodPersonByPlace(matches[2]), '杀死');
+                await combat.fire();
+            } else if (FugitiveManager.getKillBadPerson()) {
+                combat.initialize(new Npc(matches[1]), '杀死');
+                await combat.fire();
+            } else if (FugitiveManager.getKillAny()) {
+                await Objects.Npc.action(new Npc(matches[1]), '观战');
+                await ExecutionManager.wait(200);
+
+                FugitiveManager._retry.initialize(function checkSituation () {
+                    if (Panels.Combat.getTeam1()) {
+
+                    }
+                }, async function startFighting () {
+
+                });
+
+                await FugitiveManager.fire();
+            }
+        },
+
+        getGoodPersonByPlace (place) {
+            return new Npc('');
+        },
+
         getNames () {
             return System.getVariant(System.keys.FUGITIVE_NAMES, '段老大');
         },
 
         setNames (names) {
             System.setVariant(System.keys.FUGITIVE_NAMES, names);
+        },
+
+        getSmartRule () {
+            return System.getVariant(System.keys.FUGITIVE_SMART_RULE, '10000/4/500000');
+        },
+
+        setSmartRule (rule) {
+            System.setVariant(System.keys.FUGITIVE_SMART_RULE, rule);
+        },
+
+        setKillAny (killAny) {
+            FugitiveManager._killAny = killAny;
+        },
+
+        getKillAny () {
+            return FugitiveManager._killAny;
+        },
+
+        setKillGoodPerson (killGoodPerson) {
+            FugitiveManager._killGoodPerson = killGoodPerson;
+        },
+
+        getKillGoodPerson () {
+            return FugitiveManager._killGoodPerson;
+        },
+
+        setKillBadPerson (killBadPerson) {
+            FugitiveManager._killBadPerson = killBadPerson;
+        },
+
+        getKillBadPerson () {
+            return FugitiveManager._killBadPerson;
         }
     };
 
@@ -2085,11 +2167,13 @@ window.setTimeout(function () {
                 return text.includes('慌不择路，逃往了');
             },
 
-            fire (message) {
+            async fire (message) {
                 let matches = System.ansiToText(message.get('msg')).match('【系统】(.*?)慌不择路，逃往了(.*?)-href;0;(.*?).*?0');
                 if (matches && (!FugitiveManager.getNames() || FugitiveManager.getNames().split(',').some(v => matches[1].match(v)))) {
                     debugging(`发现逃犯 ${matches[1]}, 位置 ${matches[2]}`);
                     ExecutionManager.execute(`clickButton('${matches[3]}', 0) `);
+
+                    await FugitiveManager.handle(matches);
                 }
             }
         }
@@ -4042,16 +4126,14 @@ window.setTimeout(function () {
                     debugging('regMatch: ', regMatch);
                     debugging('regExcluded: ', regExcluded);
 
-                    if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
+                    if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
+                        debugging('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
+                    } else if (regMatch && (DragonMonitor._dragon.getBonus().match(regMatch) || DragonHelper.observerMode(DragonMonitor._dragon))) {
                         DragonMonitor.turnOnDragonHandler();
 
                         if (Objects.Room.getNameV2() !== DragonMonitor._dragon.getRoom()) ExecutionManager.execute(`clickButton('${DragonMonitor._dragon.getLink()}', 0) `);
                     } else {
-                        if (regExcluded && DragonMonitor._dragon.getBonus().match(regExcluded)) {
-                            debugging('特别筛除的目标：' + DragonMonitor._dragon.getBonus());
-                        } else {
-                            debugging('没有关注的目标：' + DragonMonitor._dragon.getBonus());
-                        }
+                        debugging('没有关注的目标：' + DragonMonitor._dragon.getBonus());
                     }
                 } catch (err) {
                     debugging('青龙处理出错', err);
@@ -6365,13 +6447,69 @@ window.setTimeout(function () {
             }
         }, {
             label: '.',
-            title: '指定逃犯...',
+            title: '指定逃犯关键字...',
             width: '10px',
 
             async eventOnClick () {
                 let answer = window.prompt('请输入逃犯名字列表...\n\n注意：\n1. 关键字即可，比如老大\n2. 多个名字之间以半角逗号隔开\n3. 不设置则代表不挑都打', FugitiveManager.getNames());
                 if (answer || answer === '') {
                     FugitiveManager.setNames(answer);
+                }
+            }
+        }, {
+            label: '好',
+            title: '指定打好人...',
+            id: 'id-fugitive-monitor-kill-good',
+            width: '38px',
+            marginRight: '1px',
+            hidden: true,
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    FugitiveManager.setKillGoodPerson(true);
+                } else {
+                    FugitiveManager.setKillGoodPerson(false);
+                }
+            }
+        }, {
+            label: '坏',
+            title: '指定打坏人...',
+            id: 'id-fugitive-monitor-kill-bad',
+            width: '38px',
+            hidden: true,
+
+            eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    FugitiveManager.setKillBadPerson(true);
+                } else {
+                    FugitiveManager.setKillBadPerson(false);
+                }
+            }
+        }, {
+            label: '抱腿',
+            title: '按设定好的抱大腿规则随意打好人坏人',
+            id: 'id-fugitive-monitor-kill-auto',
+            width: '60px',
+            marginRight: '1px',
+            hidden: true,
+
+            async eventOnClick () {
+                if (ButtonManager.simpleToggleButtonEvent(this)) {
+                    FugitiveManager.setKillAny(true);
+                } else {
+                    FugitiveManager.setKillAny(false);
+                }
+            }
+        }, {
+            label: '.',
+            title: '设定抱大腿的规则...',
+            width: '10px',
+            hidden: true,
+
+            async eventOnClick () {
+                let answer = window.prompt('请按格式设定抱大腿逻辑：等待观望秒数/空位剩多少一定加入/只要有达到多少血量的大腿加入时跟着加入 的格式输入指定参数：\n\n例子：5000/4/500000 代表到现场后等待观望 5 秒，当一方空位只剩 4 个或者 4 个以下时赶紧加入，或者一方有血量超过 50 万的大腿加入时赶紧跟着加入', FugitiveManager.getSmartRule());
+                if (answer) {
+                    FugitiveManager.setSmartRule(answer);
                 }
             }
         }]
