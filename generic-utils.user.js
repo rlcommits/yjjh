@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.141
+// @version      2.1.142
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
@@ -361,6 +361,14 @@ window.setTimeout(function () {
 
         getAreaRange () {
             return User._areaRange;
+        },
+
+        getMapPassed (mapId) {
+            let msgJhList = System.globalObjectMap.get('msg_jh_list');
+
+            if (msgJhList) {
+                return parseInt(msgJhList.get(`finish${mapId}`)) > 0;
+            }
         },
 
         attributes: {
@@ -6879,26 +6887,37 @@ window.setTimeout(function () {
             }
         }, {
             label: '天',
-            title: '一键到天山千年寒冰...\n\n注意：\n1. 出发点从天山山脚开始。\n2. 请预先自备掌门手喻在背包。',
+            title: '一键到天山千年寒冰...\n\n注意：\n1. 如天山地图没有开，需要自行寻找谜题从天山山脚作为出发点开始。\n2. 请预先自备掌门手喻在背包。',
             id: 'id-tianshan-daily',
             width: '38px',
             marginRight: '1px',
 
-            eventOnClick () {
+            async eventOnClick () {
                 if (ButtonManager.simpleToggleButtonEvent(this)) {
-                    let warning = '';
-                    if (!Panels.Backpack.getQuantityByName('御寒衣')) warning = '当前身上没有御寒衣，去了也白去。';
-                    if (Objects.Room.getName() !== '天山山脚') warning = '请先自行走到天山山脚。';
-
-                    if (warning) {
-                        window.alert(warning);
+                    if (!Panels.Backpack.getQuantityByName('御寒衣')) {
+                        window.alert('当前身上没有御寒衣，去了也白去。');
                         ButtonManager.resetButtonById(this.id);
-                        return;
-                    }
+                    } else {
+                        await ButtonManager.click('jh;prev');
+                        if (User.getMapPassed(39) && Objects.Room.getName() !== '天山山脚') await Navigation.move('jh 39;ne;e;n;ne;ne;n');
 
-                    if (window.confirm('此项目耗时看脸，确定开始？')) TianshanDailyHelper.start();
+                        if (Objects.Room.getName() === '天山山脚') {
+                            start(this.id);
+                        } else {
+                            window.alert('请先自行走到天山山脚。');
+                            ButtonManager.resetButtonById(this.id);
+                        }
+                    }
                 } else {
                     TianshanDailyHelper.stop();
+                }
+
+                function start (id) {
+                    if (window.confirm('此项目耗时看脸，确定开始？')) {
+                        TianshanDailyHelper.start();
+                    } else {
+                        ButtonManager.resetButtonById(id);
+                    }
                 }
             }
         }, {
