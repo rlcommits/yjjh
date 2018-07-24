@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         遇见江湖常用工具集
 // @namespace    http://tampermonkey.net/
-// @version      2.1.142
+// @version      2.1.143
 // @license      MIT; https://github.com/ccd0/4chan-x/blob/master/LICENSE
 // @description  just to make the game easier!
 // @author       RL
 // @include      http://sword-direct*.yytou.cn*
+// @include      http://sword-server*.yytou.cn*
 // @run-at       document-idle
 // @grant        unsafeWindow
 // @grant        GM_setValue
